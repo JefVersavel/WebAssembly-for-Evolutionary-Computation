@@ -1,0 +1,40 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: c49101d7fd2bf43d1e83496f9540a7d36378dd53cb50d37e1ab2647adcc7931d
+
+name:           wasm-alife
+version:        0.1.0.0
+synopsis:       Artificial Life emulator based on WebAssembly
+description:    Please see the README on GitHub at <https://github.com/JefVersavel/WebAssembly-for-Evolutionary-Computation>
+category:       AI
+homepage:       https://github.com/JefVersavel/WebAssembly-for-Evolutionary-Computation#readme
+bug-reports:    https://github.com/JefVersavel/WebAssembly-for-Evolutionary-Computation/issues
+author:         Jef Versavel
+maintainer:     jef.versavel@student.kuleuven.be
+copyright:      (c) 2020 Jef Versavel
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/JefVersavel/WebAssembly-for-Evolutionary-Computation
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_wasm_alife
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010

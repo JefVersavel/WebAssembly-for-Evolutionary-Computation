@@ -1,0 +1,22 @@
+name:                wasm-alife
+version:             0.1.0.0
+github:              JefVersavel/WebAssembly-for-Evolutionary-Computation
+license:             BSD-3-Clause
+author:              Jef Versavel
+maintainer:          jef.versavel@student.kuleuven.be
+copyright:           (c) 2020 Jef Versavel
+category:            AI
+synopsis:            Artificial Life emulator based on WebAssembly
+description:         Please see the README on GitHub at <https://github.com/JefVersavel/WebAssembly-for-Evolutionary-Computation>
+
+extra-source-files:
+  - README.md
+  - ChangeLog.md
+
+dependencies:
+  - base >= 4.7 && < 5
+
+ghc-options: -Wall
+
+library:
+  source-dirs: src
