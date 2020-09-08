@@ -23,4 +23,7 @@ jobs:
 
       - name: test
         run: |
+          mkdir -p ~/.stack
+          echo "system-ghc: true" > ~/.stack/config.yaml
+
           stack -j2 test
