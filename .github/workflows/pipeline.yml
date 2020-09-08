@@ -14,9 +14,9 @@ jobs:
       - name: setup-haskell
         uses: actions/setup-haskell@main
         with:
+          ghc-version: 8.8.4
           stack-version: 2.3.3
           enable-stack: true
-          stack-no-global: true
 
       - name: checkout
         uses: actions/checkout@v2
