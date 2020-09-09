@@ -1,1 +1,1 @@
-# WebAssembly-for-Evolutionary-Computation
+# `wasm-alife`

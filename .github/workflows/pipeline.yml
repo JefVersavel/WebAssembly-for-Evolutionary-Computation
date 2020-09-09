@@ -1,0 +1,29 @@
+name: pipeline
+
+on:
+  - push
+  - pull_request
+
+jobs:
+
+  stack:
+    name: stack
+    runs-on: ubuntu-20.04
+    steps:
+
+      - name: setup-haskell
+        uses: actions/setup-haskell@main
+        with:
+          ghc-version: 8.8.4
+          stack-version: 2.3.3
+          enable-stack: true
+
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: test
+        run: |
+          mkdir -p ~/.stack
+          echo "system-ghc: true" > ~/.stack/config.yaml
+
+          stack -j2 test
