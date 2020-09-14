@@ -1,21 +1,16 @@
-import GHC.Generics (Generic)
-import Test.QuickCheck
-
-import Generic.Random
+module AST where
 
 data Expression =
   Const Float |
   BinOp BinaryOperation Expression Expression |
-  UnOp UnaryOperation Expression
+  UnOp UnaryOperation Expression |
+  RelOp RelationalOperation Expression Expression
 
-data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign | Eq | Ne | Lt | Gt | Le | Ge
+data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
 
-instance Arbitrary Binaryoperation where
-  arbitrary = oneof
-    [Add , Sub , Mul]
-
+data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -25,12 +20,6 @@ instance Show BinaryOperation where
   show Min = " min "
   show Max = " max "
   show Copysign = " copysign "
-  show Eq = " == "
-  show Ne = " =/= "
-  show Lt = " < "
-  show Gt = " > "
-  show Le = " <= "
-  show Ge = " >= "
 
 instance Show UnaryOperation where
   show Abs = " abs "
@@ -41,10 +30,22 @@ instance Show UnaryOperation where
   show Trunc = " trunc "
   show Nearest = " nearest "
 
+instance Show RelationalOperation where
+  show Eq = " == "
+  show Ne = " =/= "
+  show Lt = " < "
+  show Gt = " > "
+  show Le = " <= "
+  show Ge = " >= "
 
 instance Show Expression where
   show (Const f) = show f ++ " "
   show (BinOp b e1 e2) = "(" ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
   show (UnOp u e1) = "(" ++ show u ++ " " ++ show e1 ++ ")"
+  show (RelOp r e1 e2) = "(" ++ show r ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
 
-m = show (BinOp Add (UnOp Abs (Const (-2.4))) (Const 6.5))
+getMaxDepth :: Expression -> Int
+getMaxDepth (Const _) = 0
+getMaxDepth (UnOp _ e) = 1 + (getMaxDepth e)
+getMaxDepth (BinOp _ e1 e2) = 1 + (max (getMaxDepth e1) (getMaxDepth e2))
+getMaxDepth (RelOp _ e1 e2) = 1 + (max (getMaxDepth e1) (getMaxDepth e2))
