@@ -27,3 +27,10 @@ rParam m seed = return $ Param i
 -- third argument : amount of parameters
 grow :: Int -> Int -> Int -> Gen Expression
 grow seed 0 nrParam = oneof [(rConst seed), (rParam seed nrParam)]
+
+-- FULL generator
+-- first argument : seed,
+-- second argument : maxdepth,
+-- third argument : amount of parameters
+full :: Int -> Int -> Int -> Gen Expression
+full seed 0 nrParam = oneof [(rConst seed), (rParam seed nrParam)]
