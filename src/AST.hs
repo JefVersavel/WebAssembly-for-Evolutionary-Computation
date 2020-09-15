@@ -1,7 +1,7 @@
 module AST where
 
 data Expression =
-  Const Float |
+  Const Double |
   -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
   Param Int |
   BinOp BinaryOperation Expression Expression |
