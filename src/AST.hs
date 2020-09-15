@@ -9,10 +9,13 @@ data Expression =
   RelOp RelationalOperation Expression Expression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
+  deriving (Enum)
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
+  deriving (Enum)
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
+  deriving (Enum)
 
 instance Show BinaryOperation where
   show Add = " + "

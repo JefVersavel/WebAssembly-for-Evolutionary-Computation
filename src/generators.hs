@@ -3,27 +3,27 @@ import Test.QuickCheck
 import System.Random
 
 rBinOp :: Integer -> Gen BinaryOperation
-rBinOp seed = variant seed (elements [Add, Sub, Mul, Div, Min, Max, Copysign])
+rBinOp seed = variant seed $ chooseEnum (Add,Copysign)
 
 rUnOp :: Integer -> Gen UnaryOperation
-rUnOp seed = variant seed (elements [Abs, Neg, Sqrt, Ceil, Floor, Trunc, Nearest])
+rUnOp seed = variant seed $ chooseEnum (Abs,Nearest)
 
 rRelOp :: Integer -> Gen RelationalOperation
-rRelOp seed = variant seed (elements [Eq, Ne, Lt, Gt, Le, Ge])
+rRelOp seed = variant seed $ chooseEnum (Eq,Ge)
 
-rConst :: Int -> (Expression, StdGen)
-rConst seed = (Const d, g)
+rConst :: Int -> Gen Expression
+rConst seed = return $ Const d
   where
-    (d, g) = random (mkStdGen seed)
+    d = fst $ random (mkStdGen seed)
 
-rParam :: Int -> Int -> (Expression, StdGen)
-rParam m seed = (Param i, g)
+rParam :: Int -> Int -> Gen Expression
+rParam m seed = return $ Param i
   where
-    (i, g) = randomR (0, m-1) (mkStdGen seed)
+    i = fst $ randomR (0, m-1) (mkStdGen seed)
 
-
-
-
-
-
-main = generate (rBinOp 10)
+-- GROW generator
+-- first argument : seed,
+-- second argument : maxdepth,
+-- third argument : amount of parameters
+grow :: Int -> Int -> Int -> Gen Expression
+grow seed 0 nrParam = oneof [(rConst seed), (rParam seed nrParam)]
