@@ -80,6 +80,23 @@ fullOne seed d nrParam = frequency [
 -- second argument : maxdepth,
 -- third argument : amount of parameters,
 -- fourth argument : amount of generators
+-- fifth argument : specic initialization method (grow or full)
 generateInitList :: Int -> Int -> Int -> Int -> (Int -> Int -> Int -> Gen Expression) -> [Gen Expression]
 generateInitList _ _ _ 0 _ = []
 generateInitList seed d nrParam n gen = [gen seed d nrParam] ++ generateInitList seed d nrParam (n-1) gen
+
+-- executes the ramped half and half method for population initialization
+-- first argument : seed,
+-- second argument : maxdepth,
+-- third argument : amount of parameters,
+-- fourth argument : amount of generators
+-- fifth argument : ratio of of grow vs full
+rampedHalfNHalf :: Int -> Int -> Int -> Int -> Float -> [Gen Expression]
+rampedHalfNHalf seed d nrParam n ratio
+  | ratio <=1 && ratio >= 0 = growList ++ fullList
+  | otherwise = error "Please provide a ration between 0 and 1."
+  where
+    growN = floor $ ratio * fromIntegral n
+    fullN = floor $ (1 - ratio) * fromIntegral n
+    growList = generateInitList seed d nrParam growN growOne
+    fullList = generateInitList seed d nrParam fullN fullOne
