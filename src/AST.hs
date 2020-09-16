@@ -17,23 +17,24 @@ data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
   deriving (Enum)
 
-getConstVal :: Expression -> Maybe Int
+getConstVal :: Expression -> Maybe Double
 getConstVal (Const i) = Just i
 getConstVal _ = Nothing
+
 
 getIndex :: Expression -> Maybe Int
 getIndex (Param i) = Just i
 getIndex _ = Nothing
 
 getFirstExpression :: Expression -> Maybe Expression
-getFirstExpression (BinOp e _) = Just e
-getFirstExpression (UnOp e) = Just e
-getFirstExpression (RelOp e _) = Just e
+getFirstExpression (BinOp _ e _) = Just e
+getFirstExpression (UnOp _ e) = Just e
+getFirstExpression (RelOp _ e _) = Just e
 getFirstExpression _ = Nothing
 
 getSecondExpression :: Expression -> Maybe Expression
-getSecondExpression (BinOp _ e) = Just e
-getSecondExpression (RelOp _ e) = Just e
+getSecondExpression (BinOp _ _ e) = Just e
+getSecondExpression (RelOp _ _ e) = Just e
 getSecondExpression _ = Nothing
 
 instance Show BinaryOperation where
