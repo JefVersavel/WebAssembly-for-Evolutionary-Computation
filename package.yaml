@@ -17,7 +17,8 @@ dependencies:
   - base >= 4.7 && < 5
   - random
   - QuickCheck
-
+  - splitmix
+  - mtl
 ghc-options: -Wall
 
 library:

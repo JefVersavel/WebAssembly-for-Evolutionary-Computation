@@ -1,5 +1,7 @@
 module AST where
 
+import Data.Foldable
+
 data Expression =
   Const Double |
   -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
@@ -64,11 +66,17 @@ instance Show RelationalOperation where
   show Ge = " >= "
 
 instance Show Expression where
-  show (Const f) = show f ++ " "
-  show (Param i) = "param[" ++ show i ++ "] "
-  show (BinOp b e1 e2) = "(" ++ show b ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
-  show (UnOp u e1) = "(" ++ show u ++ " " ++ show e1 ++ ")"
-  show (RelOp r e1 e2) = "(" ++ show r ++ " " ++ show e1 ++ " " ++ show e2 ++ ")"
+  show e = show' e 0
+
+show' :: Expression -> Int -> String
+show' _ d 
+  | d < 0 = error "The depth cannot be less than 0"
+show' (Const f) _ = show f
+show' (Param i) _ = "param[" ++ show i ++ "]"
+show' (BinOp b e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show b ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
+show' (UnOp u e1) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show u ++ show' e1 (d+1) ++ ")"
+show' (RelOp r e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show r ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
+
 
 getMaxDepth :: Expression -> Int
 getMaxDepth (Const _) = 0
