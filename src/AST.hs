@@ -71,8 +71,8 @@ instance Show Expression where
 show' :: Expression -> Int -> String
 show' _ d 
   | d < 0 = error "The depth cannot be less than 0"
-show' (Const f) _ = show f
-show' (Param i) _ = "param[" ++ show i ++ "]"
+show' (Const f) _ = show f ++ " "
+show' (Param i) _ = "param[" ++ show i ++ "] "
 show' (BinOp b e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show b ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
 show' (UnOp u e1) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show u ++ show' e1 (d+1) ++ ")"
 show' (RelOp r e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show r ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
