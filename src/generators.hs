@@ -3,14 +3,12 @@ import Test.QuickCheck
 import Test.QuickCheck.Random
 import Seeding
 import Control.Monad.Reader
+import Test.QuickCheck.Gen
 
 -- was gonna use chooseEnum instead of elements but it is not available anymore apparantly, weird?
 rBinOp :: Gen BinaryOperation
 rBinOp = elements [Add, Sub, Mul, Div, Min, Max, Copysign]
 
--- second argument : maxdepth,
--- third argument : amount of parameters
--- fourth argument : initialization method
 rBinExpr :: Gen Expression -> Gen Expression -> Gen Expression
 rBinExpr gExpr1 gExpr2 = do
   op <- rBinOp
@@ -21,9 +19,6 @@ rBinExpr gExpr1 gExpr2 = do
 rUnOp :: Gen UnaryOperation
 rUnOp = elements [Abs, Neg, Sqrt, Ceil, Floor, Trunc, Nearest]
 
--- second argument : maxdepth,
--- third argument : amount of parameters
--- fourth argument : initialization method
 rUnExpr :: Gen Expression -> Gen Expression
 rUnExpr gExpr = do
   op <- rUnOp
@@ -33,9 +28,6 @@ rUnExpr gExpr = do
 rRelOp :: Gen RelationalOperation
 rRelOp = elements [Eq, Ne, Lt, Gt, Le, Ge]
 
--- second argument : maxdepth,
--- third argument : amount of parameters
--- fourth argument : initialization method
 rRelExpr :: Gen Expression -> Gen Expression -> Gen Expression
 rRelExpr gExpr1 gExpr2 = do
   op <- rRelOp
@@ -50,59 +42,62 @@ rParam :: Int -> Gen Expression
 rParam m = Param <$> elements [0, 1 .. (m-1)]
 
 -- GROWONE generator
--- second argument : maxdepth,
--- third argument : amount of parameters
-growOne :: Int -> Int -> Gen Expression
-growOne 0 nrParam = oneof [rConst, (rParam nrParam)]
-growOne d nrParam = frequency [
-  (1, rConst),
-  (1, rParam nrParam),
-  (7, rBinExpr (growOne (d-1) nrParam) (growOne (d-1) nrParam)),
-  (7, rUnExpr (growOne (d-1) nrParam)),
-  (7, rRelExpr (growOne (d-1) nrParam) (growOne (d-1) nrParam))
-  ]
+growOne :: Int -> Reader (Int, Int) (Gen Expression)
+growOne d = do 
+  (maxD, nrParam) <- ask
+  if d < maxD
+    then 
+      do
+      g1 <- growOne $ d+1
+      g2 <- growOne $ d+1
+      return $ frequency [(1, rConst), (1, rParam nrParam), (7, rBinExpr g1 g2), (7, rUnExpr g1), (6, rRelExpr g1 g2)]
+  else
+    return $ oneof [rConst, (rParam nrParam)]
 
-growOneInit :: QCGen -> Int -> Int -> Gen Expression
-growOneInit gen d nrParam = useSeed gen $ growOne d nrParam
-  
+growOneInit :: QCGen -> Reader (Int, Int) (Gen Expression)
+growOneInit gen = do
+  g <- growOne 0
+  let seeded = useSeed gen g
+  return seeded
 
 -- FULLONE generator
--- second argument : maxdepth,
--- third argument : amount of parameters
-fullOne :: Int -> Int -> Gen Expression
-fullOne 0 nrParam = oneof [rConst, (rParam nrParam)]
-fullOne d nrParam = frequency [
-  (7, rBinExpr (fullOne (d-1) nrParam) (fullOne (d-1) nrParam)),
-  (7, rUnExpr (fullOne (d-1) nrParam)),
-  (6, rRelExpr (fullOne (d-1) nrParam) (fullOne (d-1) nrParam))
-  ]
+fullOne :: Int -> Reader (Int, Int) (Gen Expression)
+fullOne d = do
+  (maxD, nrParam) <- ask
+  if d < maxD
+    then
+      do
+      f1 <- fullOne $ d+1
+      f2 <- fullOne $ d+1
+      return $ frequency [(7, rBinExpr f1 f2), (7, rUnExpr f1), (6, rRelExpr f1 f2)]
+  else
+    return $ oneof [rConst, (rParam nrParam)]
 
-fullOneInit :: QCGen -> Int -> Int -> Gen Expression
-fullOneInit gen d nrParam = useSeed gen $ fullOne d nrParam
-
--- list of initializations generator
--- second argument : maxdepth,
--- third argument : amount of parameters,
--- fourth argument : amount of generators
--- fifth argument : specic initialization method (grow or full)
-generateInitList :: [QCGen] -> Int -> Int -> (QCGen -> Int -> Int -> Gen Expression) -> [Gen Expression]
-generateInitList gens d nrParam method = [method gen d nrParam | gen <- gens]
+fullOneInit :: QCGen -> Reader (Int, Int) (Gen Expression)
+fullOneInit gen = do
+  g <- fullOne 0
+  let seeded = useSeed gen g
+  return seeded
 
 -- executes the ramped half and half method for population initialization
--- first argument : seed,
--- second argument : maxdepth,
--- third argument : amount of parameters,
--- fourth argument : ratio of of grow vs full
-rampedHalfNHalf :: QCGen -> Int -> Int -> Float -> Int -> [Gen Expression]
-rampedHalfNHalf gen d nrParam ratio n
+rampedHalfNHalf :: QCGen -> Int -> Int -> Double -> [Gen Expression]
+rampedHalfNHalf gen d nrParam ratio
   | ratio <=1 && ratio >= 0 = growList ++ fullList
   | otherwise = error "Please provide a ratio between 0 and 1."
   where
-    growN = floor $ ratio * fromIntegral n
-    fullN = floor $ (1 - ratio) * fromIntegral n
-    growSeeds = growSeedList gen growN
-    fullSeeds = growSeedList (last growSeeds) fullN
-    growList = generateInitList growSeeds d nrParam growOneInit
-    fullList = generateInitList fullSeeds d nrParam fullOneInit
+    (growSeeds, fullSeeds) = grow2SeedLists gen 5 5
+    growList = generateInitList growSeeds growOneInit
+    fullList = generateInitList fullSeeds fullOneInit
+    generateInitList gens method = [runReader (method g) (d, nrParam) | g <- gens]
 
-main = generate $ head [g| g <- rampedHalfNHalf (mkQCGen 99) 5 10 0.5 50]
+
+generateWithSeed :: QCGen -> Gen a -> IO a
+generateWithSeed seed (MkGen g) = do 
+  return (g seed 30)
+
+
+test :: IO [Expression]
+test = do 
+  sequence [generate g | g <- rampedHalfNHalf (mkQCGen 15) 5 10 0.5]
+
+
