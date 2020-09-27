@@ -83,12 +83,14 @@ fullOneInit gen = do
   return seeded
 
 -- executes the ramped half and half method for population initialization
-rampedHalfNHalf :: QCGen -> Int -> Int -> Double -> [Gen Expression]
-rampedHalfNHalf gen d nrParam ratio
+rampedHalfNHalf :: QCGen -> Int -> Int -> Double -> Int -> [Gen Expression]
+rampedHalfNHalf gen d nrParam ratio n
   | ratio <=1 && ratio >= 0 = growList ++ fullList
   | otherwise = error "Please provide a ratio between 0 and 1."
   where
-    (growSeeds, fullSeeds) = grow2SeedLists gen 5 5
+    growN = floor $ ratio * fromIntegral n
+    fullN = floor $ (1 - ratio) * fromIntegral n
+    (growSeeds, fullSeeds) = grow2SeedLists gen growN fullN
     growList = generateInitList growSeeds growOneInit
     fullList = generateInitList fullSeeds fullOneInit
     generateInitList gens method = [runReader (method g) (fst $ randomR (0, d) g, nrParam) | g <- gens]
@@ -101,6 +103,6 @@ generateWithSeed seed (MkGen g) = do
 
 genExpressions :: Int -> IO [Expression]
 genExpressions seed = do 
-  sequence [generate g | g <- rampedHalfNHalf (mkQCGen seed) 5 10 0.5]
+  sequence [generate g | g <- rampedHalfNHalf (mkQCGen seed) 5 10 0.5 10]
 
---- >>> genExpressions 10
+--- >>> genExpressions 100
