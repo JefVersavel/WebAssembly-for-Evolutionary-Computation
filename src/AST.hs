@@ -1,7 +1,5 @@
 module AST where
 
-import Data.Foldable
-
 data Expression =
   Const Double |
   -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
@@ -11,13 +9,13 @@ data Expression =
   RelOp RelationalOperation Expression Expression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum)
+  deriving (Enum, Eq)
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum)
+  deriving (Enum, Eq)
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum)
+  deriving (Enum, Eq)
 
 getConstVal :: Expression -> Maybe Double
 getConstVal (Const i) = Just i
@@ -67,6 +65,15 @@ instance Show RelationalOperation where
 
 instance Show Expression where
   show e = show' e 0
+
+instance Eq Expression where
+  (Const d1) == (Const d2) = d1 == d2
+  (Param i1) == (Param i2) = i1 == i2
+  (BinOp b1 e11 e12) == (BinOp b2 e21 e22) = b1 == b2 && e11 == e21 && e12 == e22
+  (RelOp r1 e11 e12) == (RelOp r2 e21 e22) = r1 == r2 && e11 == e21 && e12 == e22
+  (UnOp u1 e1) == (UnOp u2 e2) = u1 == u2 && e1 == e2
+  _ == _ = False
+
 
 show' :: Expression -> Int -> String
 show' _ d 

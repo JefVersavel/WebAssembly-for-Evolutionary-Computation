@@ -1,3 +1,5 @@
+module Generators where
+
 import AST
 import Test.QuickCheck
 import Test.QuickCheck.Random
@@ -96,8 +98,8 @@ generateWithSeed seed (MkGen g) = do
   return (g seed 30)
 
 
-test :: IO [Expression]
-test = do 
-  sequence [generate g | g <- rampedHalfNHalf (mkQCGen 15) 5 10 0.5]
+genExpressions :: Int -> IO [Expression]
+genExpressions seed = do 
+  sequence [generate g | g <- rampedHalfNHalf (mkQCGen seed) 5 10 0.5]
 
 

@@ -7,7 +7,6 @@ import System.Random.SplitMix
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import System.Random (RandomGen(next))
-import Control.Concurrent
 
 newSeed :: IO QCGen
 newSeed = newQCGen
