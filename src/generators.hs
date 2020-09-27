@@ -6,6 +6,7 @@ import Test.QuickCheck.Random
 import Seeding
 import Control.Monad.Reader
 import Test.QuickCheck.Gen
+import System.Random
 
 -- was gonna use chooseEnum instead of elements but it is not available anymore apparantly, weird?
 rBinOp :: Gen BinaryOperation
@@ -90,7 +91,7 @@ rampedHalfNHalf gen d nrParam ratio
     (growSeeds, fullSeeds) = grow2SeedLists gen 5 5
     growList = generateInitList growSeeds growOneInit
     fullList = generateInitList fullSeeds fullOneInit
-    generateInitList gens method = [runReader (method g) (d, nrParam) | g <- gens]
+    generateInitList gens method = [runReader (method g) (fst $ randomR (0, d) g, nrParam) | g <- gens]
 
 
 generateWithSeed :: QCGen -> Gen a -> IO a
@@ -102,4 +103,4 @@ genExpressions :: Int -> IO [Expression]
 genExpressions seed = do 
   sequence [generate g | g <- rampedHalfNHalf (mkQCGen seed) 5 10 0.5]
 
-
+--- >>> genExpressions 10
