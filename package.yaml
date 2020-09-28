@@ -19,6 +19,8 @@ dependencies:
   - QuickCheck
   - splitmix
   - mtl
+  - transformers
+
 ghc-options: -Wall
 
 library:
