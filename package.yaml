@@ -20,6 +20,7 @@ dependencies:
   - splitmix
   - mtl
   - transformers
+  - binaryen
 
 ghc-options: -Wall
 

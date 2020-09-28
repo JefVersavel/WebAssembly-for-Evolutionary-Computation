@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 module Generators where
 
 import AST
@@ -10,7 +12,7 @@ import System.Random
 
 -- was gonna use chooseEnum instead of elements but it is not available anymore apparantly, weird?
 rBinOp :: Gen BinaryOperation
-rBinOp = elements [Add, Sub, Mul, Div, Min, Max, Copysign]
+rBinOp = elements [minBound::BinaryOperation .. maxBound @BinaryOperation]
 
 rBinExpr :: Gen Expression -> Gen Expression -> Gen Expression
 rBinExpr gExpr1 gExpr2 = do
@@ -20,7 +22,7 @@ rBinExpr gExpr1 gExpr2 = do
   return $ BinOp op e1 e2
 
 rUnOp :: Gen UnaryOperation
-rUnOp = elements [Abs, Neg, Sqrt, Ceil, Floor, Trunc, Nearest]
+rUnOp = elements [minBound @UnaryOperation .. maxBound @UnaryOperation]
 
 rUnExpr :: Gen Expression -> Gen Expression
 rUnExpr gExpr = do
@@ -29,7 +31,7 @@ rUnExpr gExpr = do
   return $ UnOp op e
 
 rRelOp :: Gen RelationalOperation
-rRelOp = elements [Eq, Ne, Lt, Gt, Le, Ge]
+rRelOp = elements [minBound @RelationalOperation .. maxBound @RelationalOperation]
 
 rRelExpr :: Gen Expression -> Gen Expression -> Gen Expression
 rRelExpr gExpr1 gExpr2 = do
@@ -104,5 +106,3 @@ generateWithSeed seed (MkGen g) = do
 genExpressions :: Int -> IO [Expression]
 genExpressions seed = do 
   sequence [generate g | g <- rampedHalfNHalf (mkQCGen seed) 5 10 0.5 10]
-
---- >>> genExpressions 100

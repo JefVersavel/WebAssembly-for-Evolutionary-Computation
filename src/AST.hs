@@ -9,13 +9,13 @@ data Expression =
   RelOp RelationalOperation Expression Expression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum, Eq)
+  deriving (Enum, Eq, Bounded)
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum, Eq)
+  deriving (Enum, Eq, Bounded)
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum, Eq)
+  deriving (Enum, Eq, Bounded)
 
 getConstVal :: Expression -> Maybe Double
 getConstVal (Const i) = Just i
@@ -48,7 +48,7 @@ instance Show BinaryOperation where
 
 instance Show UnaryOperation where
   show Abs = " abs "
-  show Neg = " - "
+  show Neg = " neg "
   show Sqrt = " sqrt "
   show Ceil = " ceil "
   show Floor = " floor "
