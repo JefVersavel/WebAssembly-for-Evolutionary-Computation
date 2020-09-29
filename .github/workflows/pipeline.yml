@@ -18,6 +18,12 @@ jobs:
           stack-version: 2.3.3
           enable-stack: true
 
+      - name: setup-deps
+        run: |
+          curl -L https://snapshot.debian.org/archive/debian/20200919T085932Z/pool/main/b/binaryen/binaryen_96-1_amd64.deb -o /tmp/binaryen.deb
+          sudo dpkg -i /tmp/binaryen.deb
+          rm /tmp/binaryen.deb
+
       - name: checkout
         uses: actions/checkout@v2
 
