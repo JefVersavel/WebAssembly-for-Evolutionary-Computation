@@ -1,12 +1,15 @@
 module AST where
 
-data Expression =
+import BinaryenTranslation
+import Binaryen.Op
+
+data ASTExpression =
   Const Double |
   -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
   Param Int |
-  BinOp BinaryOperation Expression Expression |
-  UnOp UnaryOperation Expression |
-  RelOp RelationalOperation Expression Expression
+  BinOp BinaryOperation ASTExpression ASTExpression |
+  UnOp UnaryOperation ASTExpression |
+  RelOp RelationalOperation ASTExpression ASTExpression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
   deriving (Enum, Eq, Bounded)
@@ -17,25 +20,24 @@ data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
   deriving (Enum, Eq, Bounded)
 
-getConstVal :: Expression -> Maybe Double
+getConstVal :: ASTExpression -> Maybe Double
 getConstVal (Const i) = Just i
 getConstVal _ = Nothing
 
-
-getIndex :: Expression -> Maybe Int
+getIndex :: ASTExpression -> Maybe Int
 getIndex (Param i) = Just i
 getIndex _ = Nothing
 
-getFirstExpression :: Expression -> Maybe Expression
-getFirstExpression (BinOp _ e _) = Just e
-getFirstExpression (UnOp _ e) = Just e
-getFirstExpression (RelOp _ e _) = Just e
-getFirstExpression _ = Nothing
+getFirstASTExpression :: ASTExpression -> Maybe ASTExpression
+getFirstASTExpression (BinOp _ e _) = Just e
+getFirstASTExpression (UnOp _ e) = Just e
+getFirstASTExpression (RelOp _ e _) = Just e
+getFirstASTExpression _ = Nothing
 
-getSecondExpression :: Expression -> Maybe Expression
-getSecondExpression (BinOp _ _ e) = Just e
-getSecondExpression (RelOp _ _ e) = Just e
-getSecondExpression _ = Nothing
+getSecondASTExpression :: ASTExpression -> Maybe ASTExpression
+getSecondASTExpression (BinOp _ _ e) = Just e
+getSecondASTExpression (RelOp _ _ e) = Just e
+getSecondASTExpression _ = Nothing
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -46,6 +48,15 @@ instance Show BinaryOperation where
   show Max = " max "
   show Copysign = " copysign "
 
+instance OperationTranslation BinaryOperation where
+  translateOp Add = addFloat64
+  translateOp Sub = subFloat64
+  translateOp Mul = mulFloat64
+  translateOp Div = divFloat64
+  translateOp Min = minFloat64
+  translateOp Max = maxFloat64
+  translateOp Copysign = copySignFloat64
+
 instance Show UnaryOperation where
   show Abs = " abs "
   show Neg = " neg "
@@ -55,6 +66,15 @@ instance Show UnaryOperation where
   show Trunc = " trunc "
   show Nearest = " nearest "
 
+instance OperationTranslation UnaryOperation where
+  translateOp Abs = absFloat64
+  translateOp Neg = negFloat64
+  translateOp Sqrt = sqrtFloat64
+  translateOp Ceil = ceilFloat64
+  translateOp Floor = floorFloat64
+  translateOp Trunc = truncFloat64
+  translateOp Nearest = nearestFloat32
+
 instance Show RelationalOperation where
   show Eq = " == "
   show Ne = " =/= "
@@ -63,10 +83,18 @@ instance Show RelationalOperation where
   show Le = " <= "
   show Ge = " >= "
 
-instance Show Expression where
+instance OperationTranslation RelationalOperation where
+  translateOp Eq = eqFloat64
+  translateOp Ne = neFloat64
+  translateOp Lt = ltFloat64
+  translateOp Gt = gtFloat64
+  translateOp Le = leFloat64
+  translateOp Ge = geFloat64
+
+instance Show ASTExpression where
   show e = show' e 0
 
-instance Eq Expression where
+instance Eq ASTExpression where
   (Const d1) == (Const d2) = d1 == d2
   (Param i1) == (Param i2) = i1 == i2
   (BinOp b1 e11 e12) == (BinOp b2 e21 e22) = b1 == b2 && e11 == e21 && e12 == e22
@@ -75,7 +103,7 @@ instance Eq Expression where
   _ == _ = False
 
 
-show' :: Expression -> Int -> String
+show' :: ASTExpression -> Int -> String
 show' _ d 
   | d < 0 = error "The depth cannot be less than 0"
 show' (Const f) _ = show f ++ " "
@@ -85,7 +113,7 @@ show' (UnOp u e1) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show u ++ sh
 show' (RelOp r e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show r ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
 
 
-getMaxDepth :: Expression -> Int
+getMaxDepth :: ASTExpression -> Int
 getMaxDepth (Const _) = 0
 getMaxDepth (Param _) = 0
 getMaxDepth (UnOp _ e) = 1 + (getMaxDepth e)
