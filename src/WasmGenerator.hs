@@ -17,10 +17,10 @@ generateExpression m params (BinOp op e1 e2) = do
 generateExpression m params (UnOp op e) = do
     ge <- generateExpression m params e
     unary m (translateOp op) ge
-generateExpression m params (RelOp op e1 e2) = do
-    ge1 <- generateExpression m params e1
-    ge2 <- generateExpression m params e2
-    binary m (translateOp op) ge1 ge2
+-- generateExpression m params (RelOp op e1 e2) = do
+--     ge1 <- generateExpression m params e1
+--     ge2 <- generateExpression m params e2
+--     binary m (translateOp op) ge1 ge2
 
 generateExpressions :: [Module] -> [Double] -> IO [Expression]
 generateExpressions mods params = do

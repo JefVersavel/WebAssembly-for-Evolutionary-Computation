@@ -4,7 +4,7 @@ module Generators where
 
 import AST
     ( BinaryOperation,
-      RelationalOperation,
+      -- RelationalOperation,
       UnaryOperation,
       ASTExpression(..) )
 import Test.QuickCheck
@@ -16,7 +16,6 @@ import Test.QuickCheck.Gen
     ( Gen(MkGen) )
 import System.Random ( Random(randomR) )
 
--- was gonna use chooseEnum instead of elements but it is not available anymore apparantly, weird?
 rBinOp :: Gen BinaryOperation
 rBinOp = elements [minBound .. maxBound]
 
@@ -36,15 +35,15 @@ rUnExpr gExpr = do
   e <- gExpr
   return $ UnOp op e
 
-rRelOp :: Gen RelationalOperation
-rRelOp = elements [minBound .. maxBound]
+-- rRelOp :: Gen RelationalOperation
+-- rRelOp = elements [minBound .. maxBound]
 
-rRelExpr :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
-rRelExpr gExpr1 gExpr2 = do
-  op <- rRelOp
-  e1 <- gExpr1
-  e2 <- gExpr2
-  return $ RelOp op e1 e2
+-- rRelExpr :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
+-- rRelExpr gExpr1 gExpr2 = do
+--   op <- rRelOp
+--   e1 <- gExpr1
+--   e2 <- gExpr2
+--   return $ RelOp op e1 e2
 
 rConst :: Gen ASTExpression
 rConst = Const <$> arbitrary
@@ -61,7 +60,7 @@ growOne d = do
       do
       g1 <- growOne $ d+1
       g2 <- growOne $ d+1
-      return $ frequency [(1, rConst), (1, rParam nrParam), (7, rBinExpr g1 g2), (7, rUnExpr g1), (6, rRelExpr g1 g2)]
+      return $ frequency [(1, rConst), (1, rParam nrParam), (13, rBinExpr g1 g2), (7, rUnExpr g1)]
   else
     return $ oneof [rConst, (rParam nrParam)]
 
@@ -80,7 +79,7 @@ fullOne d = do
       do
       f1 <- fullOne $ d+1
       f2 <- fullOne $ d+1
-      return $ frequency [(7, rBinExpr f1 f2), (7, rUnExpr f1), (6, rRelExpr f1 f2)]
+      return $ frequency [(13, rBinExpr f1 f2), (7, rUnExpr f1)]
   else
     return $ oneof [rConst, (rParam nrParam)]
 
