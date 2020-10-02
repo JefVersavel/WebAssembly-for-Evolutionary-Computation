@@ -1,11 +1,18 @@
 module GeneticOperations where
 
 import AST
+    ( getMaxDepth,
+        BinaryOperation(Add, Mul),
+        UnaryOperation(Ceil, Floor),
+        ASTExpression(..),
+        getNrNodes )
 import System.Random (RandomGen, Random(randomR))
 import Test.QuickCheck.Random (QCGen, mkQCGen)
 import Generators
-import Test.QuickCheck
-import Seeding
+    ( fullOneInit, growOneInit, rBinOp, rConst, rParam, rUnOp )
+import Test.QuickCheck ( generate, oneof )
+import Seeding ( useSeed )
+import Control.Monad.Reader (runReader)
 
 getSubExpression :: Int -> ASTExpression -> ASTExpression
 getSubExpression 0 e = e
@@ -79,6 +86,21 @@ pointMutation g1 e i = do
         b = getRandomBinOp g2
         l = getRandomLeaf g2 i
 
+generateSubTree :: QCGen -> Int -> Int -> IO ASTExpression
+generateSubTree g1 maxD nrParam 
+    | grow = generateExpression growOneInit
+    | otherwise = generateExpression fullOneInit
+    where
+        (grow, g2) = randomR (True, False) g1
+        (d, g3) = randomR (0,maxD) g2
+        generateExpression method = generate $ runReader (method g3) (d, nrParam)
 
+subTreeMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
+subTreeMutation g1 e nrParam = do
+    let (p, g2) = selectGenOpPoint g1 e
+    let maxD = getMaxDepth $ getSubExpression p e
+    subTree <- generateSubTree g2 maxD nrParam
+    return $ insertSubExpression p e subTree
 
-testGen i = pointMutation (mkQCGen i) (BinOp Mul (UnOp Floor (Const 4) )(Param 5)) 10
+testGen :: Int -> IO ASTExpression
+testGen i = subTreeMutation (mkQCGen i) (BinOp Mul (UnOp Floor (Const 4) )(BinOp Add (Const 34) (UnOp Ceil (Param 4)))) 10
