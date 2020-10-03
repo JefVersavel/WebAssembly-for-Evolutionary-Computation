@@ -60,7 +60,7 @@ growOne d = do
         do
         g1 <- growOne $ d+1
         g2 <- growOne $ d+1
-        return $ frequency [(1, rConst), (1, rParam nrParam), (13, rBinExpr g1 g2), (7, rUnExpr g1)]
+        return $ frequency [(1, rConst), (1, rParam nrParam), (length [minBound::BinaryOperation ..], rBinExpr g1 g2), (length [minBound::UnaryOperation ..], rUnExpr g1)]
     else
         return $ oneof [rConst, (rParam nrParam)]
 
@@ -79,7 +79,7 @@ fullOne d = do
         do
         f1 <- fullOne $ d+1
         f2 <- fullOne $ d+1
-        return $ frequency [(13, rBinExpr f1 f2), (7, rUnExpr f1)]
+        return $ frequency [(length [minBound::BinaryOperation ..], rBinExpr f1 f2), (length [minBound::UnaryOperation ..], rUnExpr f1)]
     else
         return $ oneof [rConst, (rParam nrParam)]
 

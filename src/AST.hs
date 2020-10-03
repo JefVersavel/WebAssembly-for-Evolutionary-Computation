@@ -2,7 +2,7 @@ module AST where
 
 import BinaryenTranslation ( OperationTranslation(..) )
 import Binaryen.Op
-    ( absFloat64,
+    (nearestFloat64,  absFloat64,
         addFloat64,
         ceilFloat64,
         copySignFloat64,
@@ -33,7 +33,7 @@ data ASTExpression =
     UnOp UnaryOperation ASTExpression
     -- RelOp RelationalOperation ASTExpression ASTExpression
 
-data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign | Eq | Ne | Lt | Gt | Le | Ge
+data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign 
     deriving (Enum, Eq, Bounded)
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
@@ -69,12 +69,12 @@ instance Show BinaryOperation where
     show Min = " min "
     show Max = " max "
     show Copysign = " copysign "
-    show Eq = " == "
-    show Ne = " =/= "
-    show Lt = " < "
-    show Gt = " > "
-    show Le = " <= "
-    show Ge = " >= "
+    -- show Eq = " == "
+    -- show Ne = " =/= "
+    -- show Lt = " < "
+    -- show Gt = " > "
+    -- show Le = " <= "
+    -- show Ge = " >= "
 
 instance OperationTranslation BinaryOperation where
     translateOp Add = addFloat64
@@ -84,12 +84,12 @@ instance OperationTranslation BinaryOperation where
     translateOp Min = minFloat64
     translateOp Max = maxFloat64
     translateOp Copysign = copySignFloat64
-    translateOp Eq = eqFloat64
-    translateOp Ne = neFloat64
-    translateOp Lt = ltFloat64
-    translateOp Gt = gtFloat64
-    translateOp Le = leFloat64
-    translateOp Ge = geFloat64
+    -- translateOp Eq = eqFloat64
+    -- translateOp Ne = neFloat64
+    -- translateOp Lt = ltFloat64
+    -- translateOp Gt = gtFloat64
+    -- translateOp Le = leFloat64
+    -- translateOp Ge = geFloat64
 
 
 instance Show UnaryOperation where
@@ -109,7 +109,7 @@ instance OperationTranslation UnaryOperation where
     translateOp Ceil = ceilFloat64
     translateOp Floor = floorFloat64
     translateOp Trunc = truncFloat64
-    translateOp Nearest = nearestFloat32
+    translateOp Nearest = nearestFloat64
 
 -- instance Show RelationalOperation where
 --   show Eq = " == "

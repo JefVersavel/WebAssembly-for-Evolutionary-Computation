@@ -1,11 +1,16 @@
 module WasmGenerator where
 
 import Generators ( genASTExpressions )
-import Binaryen.Module ( Module, create )
+import Binaryen.Module
 import Binaryen.Expression
-    ( Expression, binary, constFloat64, unary )
 import AST ( ASTExpression(..) )
 import BinaryenTranslation ( OperationTranslation(translateOp) )
+import Foreign
+import Foreign.C
+import Binaryen.Type (Type, none, float64)
+import Binaryen.Index (Index(Index))
+import Binaryen.Function (Function)
+
 
 generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
 generateExpression m _ (Const d) = constFloat64 m d
@@ -24,10 +29,24 @@ generateExpression m params (UnOp op e) = do
 
 generateExpressions :: [Module] -> [Double] -> IO [Expression]
 generateExpressions mods params = do
-    exprs <- genASTExpressions 10 5 (length params) 0.5 10
-    sequence [generateExpression m params e | e <- exprs, m <- mods]
+    exprs <- genASTExpressions 10 5 (length params) 0.5 4
+    sequence [generateExpression m params e | (e, m) <- zip exprs mods]
 
+-- generateFunction mod expr = do
+--     name <- newCString "firstFunction"
+--     addFunction name none float64 (Ptr none) (Index (w32# 1)) expr
+
+generateFunction :: Module -> [Double] -> ASTExpression -> IO Function
+generateFunction m params e = do
+    pool <- newPool
+    namePtr <- pooledNew pool (castCharToCChar 'f')
+    typePtr <- pooledNew pool none
+    expr <- generateExpression m params e
+    addFunction m namePtr none float64 typePtr (Index 0) expr
 
 test = do 
     mods <- sequence [create, create, create, create]
-    generateExpressions mods [0, 1, 2, 3]
+    let params = [0,1,2,3]
+    exprs <- genASTExpressions 10 5 (length params) 0.5 4
+    _ <- sequence [ generateFunction m params e | (e,m) <- zip exprs mods]
+    Binaryen.Module.print $ mods !! 0
