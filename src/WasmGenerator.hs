@@ -48,5 +48,8 @@ test = do
     mods <- sequence [create, create, create, create]
     let params = [0,1,2,3]
     exprs <- genASTExpressions 10 5 (length params) 0.5 4
-    _ <- sequence [ generateFunction m params e | (e,m) <- zip exprs mods]
-    Binaryen.Module.print $ mods !! 0
+    functions <- sequence [ generateFunction m params e | (e,m) <- zip exprs mods]
+    setStart (mods !! 0 ) $ functions !! 0
+    pool <- newPool
+    ptr <- pooledNew pool (CChar 0)
+    Binaryen.Module.write (mods !! 0) ptr (CSize 9999)

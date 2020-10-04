@@ -21,6 +21,10 @@ dependencies:
   - mtl
   - transformers
   - binaryen
+  - language-javascript
+  - aeson
+  - inline-js
+  - inline-js-core
 
 ghc-options: -Wall
 
