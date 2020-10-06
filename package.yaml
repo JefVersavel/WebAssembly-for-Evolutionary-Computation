@@ -26,6 +26,7 @@ dependencies:
   - aeson
   - inline-js
   - inline-js-core
+  - directory
 
 ghc-options: -Wall
 

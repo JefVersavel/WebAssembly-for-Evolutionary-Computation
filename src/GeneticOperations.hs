@@ -25,6 +25,12 @@ getSubExpression i (BinOp _ e1 e2)
     where
         nrNodes1 = getNrNodes e1
         dec = i - 1
+getSubExpression i (RelOp _ e1 e2)
+    | i <= nrNodes1 = getSubExpression dec e1
+    | otherwise = getSubExpression (dec - nrNodes1) e2
+    where
+        nrNodes1 = getNrNodes e1
+        dec = i - 1
 
 insertSubExpression :: Int -> ASTExpression -> ASTExpression -> ASTExpression
 insertSubExpression 0 _ e2 = e2
@@ -34,6 +40,12 @@ insertSubExpression i (UnOp o e1) e2 = UnOp o $ insertSubExpression (i-1) e1 e2
 insertSubExpression i (BinOp o e1 e2) e3
     | i <= nrNodes1 = BinOp o (insertSubExpression dec e1 e3) e2
     | otherwise = BinOp o e1 (insertSubExpression (dec - nrNodes1) e2 e3)
+    where
+        nrNodes1 = getNrNodes e1
+        dec = i - 1
+insertSubExpression i (RelOp o e1 e2) e3
+    | i <= nrNodes1 = RelOp o (insertSubExpression dec e1 e3) e2
+    | otherwise = RelOp o e1 (insertSubExpression (dec - nrNodes1) e2 e3)
     where
         nrNodes1 = getNrNodes e1
         dec = i - 1
@@ -70,6 +82,12 @@ replaceNode unOp binOp leaf i (UnOp o e) = UnOp o $ replaceNode unOp binOp leaf 
 replaceNode unOp binOp leaf i (BinOp o e1 e2)
     | i <= nrNodes1 = BinOp o (replaceNode unOp binOp leaf dec e1) e2
     | otherwise = BinOp o e1 (replaceNode unOp binOp leaf (dec - nrNodes1) e2)
+    where
+        nrNodes1 = getNrNodes e1
+        dec = i - 1
+replaceNode unOp binOp leaf i (RelOp o e1 e2)
+    | i <= nrNodes1 = RelOp o (replaceNode unOp binOp leaf dec e1) e2
+    | otherwise = RelOp o e1 (replaceNode unOp binOp leaf (dec - nrNodes1) e2)
     where
         nrNodes1 = getNrNodes e1
         dec = i - 1

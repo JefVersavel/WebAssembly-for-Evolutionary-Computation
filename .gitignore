@@ -3,3 +3,5 @@ stack.yaml.lock
 *.cabal
 
 src/ghciTesting.hs
+
+*.wasm
