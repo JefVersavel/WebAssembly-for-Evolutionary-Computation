@@ -4,7 +4,7 @@ module Generators where
 
 import AST
     ( BinaryOperation,
-        -- RelationalOperation,
+        RelationalOperation,
         UnaryOperation,
         ASTExpression(..) )
 import Test.QuickCheck
@@ -35,15 +35,15 @@ rUnExpr gExpr = do
     e <- gExpr
     return $ UnOp op e
 
--- rRelOp :: Gen RelationalOperation
--- rRelOp = elements [minBound .. maxBound]
+rRelOp :: Gen RelationalOperation
+rRelOp = elements [minBound .. maxBound]
 
--- rRelExpr :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
--- rRelExpr gExpr1 gExpr2 = do
---   op <- rRelOp
---   e1 <- gExpr1
---   e2 <- gExpr2
---   return $ RelOp op e1 e2
+rRelExpr :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
+rRelExpr gExpr1 gExpr2 = do
+    op <- rRelOp
+    e1 <- gExpr1
+    e2 <- gExpr2
+    return $ RelOp op e1 e2
 
 rConst :: Gen ASTExpression
 rConst = Const <$> arbitrary
@@ -60,7 +60,12 @@ growOne d = do
         do
         g1 <- growOne $ d+1
         g2 <- growOne $ d+1
-        return $ frequency [(1, rConst), (1, rParam nrParam), (length [minBound::BinaryOperation ..], rBinExpr g1 g2), (length [minBound::UnaryOperation ..], rUnExpr g1)]
+        return $ frequency [(1, rConst), 
+            (1, rParam nrParam), 
+            (length [minBound::BinaryOperation ..], rBinExpr g1 g2), 
+            (length [minBound::UnaryOperation ..], rUnExpr g1),
+            (length [minBound::RelationalOperation ..], rRelExpr g1 g2)
+            ]
     else
         return $ oneof [rConst, (rParam nrParam)]
 
@@ -79,7 +84,10 @@ fullOne d = do
         do
         f1 <- fullOne $ d+1
         f2 <- fullOne $ d+1
-        return $ frequency [(length [minBound::BinaryOperation ..], rBinExpr f1 f2), (length [minBound::UnaryOperation ..], rUnExpr f1)]
+        return $ frequency [(length [minBound::BinaryOperation ..], rBinExpr f1 f2), 
+            (length [minBound::UnaryOperation ..], rUnExpr f1), 
+            (length [minBound::RelationalOperation ..], rRelExpr f1 f2)
+            ]
     else
         return $ oneof [rConst, (rParam nrParam)]
 

@@ -1,4 +1,3 @@
-
 module Seeding where
 
 import Data.Coerce
