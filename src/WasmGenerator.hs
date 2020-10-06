@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module WasmGenerator where
 
 import Generators ( genASTExpressions )
@@ -6,7 +8,6 @@ import Binaryen.Expression (binary, unary, Expression, constFloat64)
 import AST ( ASTExpression(..) )
 import BinaryenTranslation ( OperationTranslation(translateOp) )
 import Foreign
-import Foreign.C
 import Binaryen.Type (none, float64)
 import Binaryen.Index (Index(Index))
 import Binaryen.Function (Function, getName)
@@ -14,6 +15,7 @@ import Binaryen.Op
 import BinaryenUtils
 import Data.ByteString as BS (writeFile, ByteString)
 import System.Directory
+import Pool
 
 generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
 generateExpression m _ (Const d) = constFloat64 m d
@@ -39,7 +41,7 @@ generateExpressions mods params = do
 generateFunction :: Module -> [Double] -> ASTExpression -> IO Function
 generateFunction m params e = do
     pool <- newPool
-    namePtr <- pooledNew pool (castCharToCChar 'm')
+    namePtr <- pooledNewByteString0 pool "main"
     typePtr <- pooledNew pool none
     expr <- generateExpression m params e
     addFunction m namePtr none float64 typePtr (Index 0) expr
@@ -60,11 +62,11 @@ createWasmFiles exprs params = do
     serializedMods <- sequence [serializeModule m | m <- mods]
     oldFiles <- listDirectory dir
     let oldFileNames = [dir ++ f | f <- oldFiles]
-    print "removing files:"
+    putStrLn "removing files:"
     mapM_ putStrLn ["\t" ++ n | n <- oldFileNames]
     removeAllFiles oldFileNames
     writeFiles fileNames serializedMods
-    print "Creating files:"
+    putStrLn "Creating files:"
     mapM_ putStrLn ["\t" ++ n | n <- fileNames]
     return $ zip exprs fileNames
 
