@@ -70,6 +70,12 @@ createWasmFiles exprs params = do
     mapM_ putStrLn ["\t" ++ n | n <- fileNames]
     return $ zip exprs fileNames
 
+serializeExpressions :: [ASTExpression] -> [Double] -> IO [(ASTExpression, BS.ByteString)]
+serializeExpressions exprs params = do
+    mods <- sequence [createModule e params | e <- exprs]
+    serializedMods <- sequence [serializeModule m | m <- mods]
+    return $ zip exprs serializedMods
+
 writeFiles :: [String] -> [BS.ByteString] -> IO ()
 writeFiles [] [] = return ()
 writeFiles (n:ns) (b:bs) = BS.writeFile n b >> writeFiles ns bs
@@ -82,4 +88,4 @@ removeAllFiles (f:fs) = removeFile f >> removeAllFiles fs
 test = do 
     let params = [0.913487512345, 234.345, 34.12,973456.2,-78764.2]
     exprs <- genASTExpressions 10 5 (length params) 0.5 6
-    createWasmFiles exprs params
+    serializeExpressions exprs params
