@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 module Generators where
 
 import AST
@@ -67,7 +66,7 @@ growOne d = do
             (length [minBound::RelationalOperation ..], rRelExpr g1 g2)
             ]
     else
-        return $ oneof [rConst, (rParam nrParam)]
+        return $ oneof [rConst, rParam nrParam]
 
 growOneInit :: QCGen -> Reader (Int, Int) (Gen ASTExpression)
 growOneInit gen = do
@@ -89,7 +88,7 @@ fullOne d = do
             (length [minBound::RelationalOperation ..], rRelExpr f1 f2)
             ]
     else
-        return $ oneof [rConst, (rParam nrParam)]
+        return $ oneof [rConst, rParam nrParam]
 
 fullOneInit :: QCGen -> Reader (Int, Int) (Gen ASTExpression)
 fullOneInit gen = do

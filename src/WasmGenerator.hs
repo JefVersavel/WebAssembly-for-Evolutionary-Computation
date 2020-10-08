@@ -47,7 +47,7 @@ generateFunction m params e = do
     addFunction m namePtr none float64 typePtr (Index 0) expr
 
 createModule :: ASTExpression -> [Double] -> IO Module
-createModule e params = do 
+createModule e params = do
     m <- create 
     function <- generateFunction m params e
     functionName <- getName function
@@ -82,9 +82,9 @@ writeFiles (n:ns) (b:bs) = BS.writeFile n b >> writeFiles ns bs
 writeFiles _ _ = error "the length of the filenames don't match the length of the serialized modules"
 
 removeAllFiles :: [FilePath] -> IO ()
-removeAllFiles [] = return ()
-removeAllFiles (f:fs) = removeFile f >> removeAllFiles fs
+removeAllFiles = foldr ((>>) . removeFile) (return ())
 
+test :: IO[(ASTExpression, ByteString)]
 test = do 
     let params = [0.913487512345, 234.345, 34.12,973456.2,-78764.2]
     exprs <- genASTExpressions 10 5 (length params) 0.5 6

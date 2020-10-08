@@ -9,7 +9,7 @@ import AST
 import System.Random (RandomGen, Random(randomR))
 import Test.QuickCheck.Random (QCGen, mkQCGen)
 import Generators
-    ( fullOneInit, growOneInit, rBinOp, rConst, rParam, rUnOp )
+    ( fullOneInit, growOneInit, rBinOp, rConst, rParam, rUnOp)
 import Test.QuickCheck ( generate, oneof )
 import Seeding ( useSeed )
 import Control.Monad.Reader (runReader)
@@ -65,10 +65,10 @@ crossover g1 e1 e2 = (child1, child2, g3)
         child2 = insertSubExpression p2 e2 sub1
 
 getRandomBinOp :: QCGen -> IO BinaryOperation
-getRandomBinOp g = generate $ useSeed g $ rBinOp
+getRandomBinOp g = generate $ useSeed g rBinOp
 
 getRandomUnOp :: QCGen -> IO UnaryOperation
-getRandomUnOp g = generate $ useSeed g $ rUnOp
+getRandomUnOp g = generate $ useSeed g rUnOp
 
 getRandomLeaf :: QCGen -> Int -> IO ASTExpression
 getRandomLeaf g i = generate $ useSeed g $ oneof [rConst, rParam i]

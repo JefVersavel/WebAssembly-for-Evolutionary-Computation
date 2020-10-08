@@ -110,21 +110,21 @@ show' _ d
     | d < 0 = error "The depth cannot be less than 0"
 show' (Const f) _ = " " ++ show f 
 show' (Param i) _ = " param[" ++ show i ++ "]"
-show' (BinOp b e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show b ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
-show' (UnOp u e1) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show u ++ show' e1 (d+1) ++ ")"
-show' (RelOp r e1 e2) d = "\n" ++ (concat $ replicate d "\t") ++ "(" ++ show r ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
+show' (BinOp b e1 e2) d = "\n" ++ concat (replicate d "\t") ++ "(" ++ show b ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
+show' (UnOp u e1) d = "\n" ++ concat (replicate d "\t") ++ "(" ++ show u ++ show' e1 (d+1) ++ ")"
+show' (RelOp r e1 e2) d = "\n" ++ concat (replicate d "\t") ++ "(" ++ show r ++ show' e1 (d+1) ++ show' e2 (d+1) ++ ")"
 
 
 getMaxDepth :: ASTExpression -> Int
 getMaxDepth (Const _) = 0
 getMaxDepth (Param _) = 0
-getMaxDepth (UnOp _ e) = 1 + (getMaxDepth e)
-getMaxDepth (BinOp _ e1 e2) = 1 + (max (getMaxDepth e1) (getMaxDepth e2))
-getMaxDepth (RelOp _ e1 e2) = 1 + (max (getMaxDepth e1) (getMaxDepth e2))
+getMaxDepth (UnOp _ e) =  1 + getMaxDepth e
+getMaxDepth (BinOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
+getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 
 getNrNodes :: ASTExpression -> Int
 getNrNodes (Const _) = 1
 getNrNodes (Param _) = 1
-getNrNodes (UnOp _ e) = 1 + (getNrNodes e)
-getNrNodes (BinOp _ e1 e2) = 1 + (getNrNodes e1) + (getNrNodes e2)
-getNrNodes (RelOp _ e1 e2) = 1 + (getNrNodes e1) + (getNrNodes e2)
+getNrNodes (UnOp _ e) = 1 + getNrNodes e
+getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
+getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
