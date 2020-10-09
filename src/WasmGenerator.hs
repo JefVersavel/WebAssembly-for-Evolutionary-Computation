@@ -19,7 +19,7 @@ import Pool
 
 generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
 generateExpression m _ (Const d) = constFloat64 m d
-generateExpression m params (Param i) = constFloat64 m (params !! i)
+generateExpression m params (Param i) = constFloat64 m (params !! (i-1))
 generateExpression m params (BinOp op e1 e2) = do 
     ge1 <- generateExpression m params e1
     ge2 <- generateExpression m params e2
@@ -75,6 +75,11 @@ serializeExpressions exprs params = do
     mods <- sequence [createModule e params | e <- exprs]
     serializedMods <- sequence [serializeModule m | m <- mods]
     return $ zip exprs serializedMods
+
+serializeExpression :: ASTExpression -> [Double] -> IO ByteString
+serializeExpression expr params = do
+  m <- createModule expr params
+  serializeModule m
 
 writeFiles :: [String] -> [BS.ByteString] -> IO ()
 writeFiles [] [] = return ()

@@ -13,6 +13,9 @@ import Generators
 import Test.QuickCheck ( generate, oneof )
 import Seeding ( useSeed )
 import Control.Monad.Reader (runReader)
+import ExecuteWasm
+import WasmGenerator
+import Language.JavaScript.Inline
 
 getSubExpression :: Int -> ASTExpression -> ASTExpression
 getSubExpression 0 e = e
@@ -148,8 +151,21 @@ switch g (l, r)
   where
     i = fst $ randomR (0,1) g :: Int
 
+editing :: QCGen -> ASTExpression -> [Double] -> IO ASTExpression
+editing g e params = do
+    let (point, _) = selectGenOpPoint g e
+    let subTree = getSubExpression point e
+    result <- executeSubTree subTree params
+    return $ insertSubExpression point e (Const result)
+
+executeSubTree :: ASTExpression -> [Double] -> IO Double
+executeSubTree e params = do
+  serialized <- serializeExpression e params
+  aeson <- executeModule serialized
+  return $ unAeson aeson
+
 testExpression :: ASTExpression
 testExpression = BinOp Mul (UnOp Floor (Const 4) )(BinOp Add (Const 34) (UnOp Ceil (Param 4)))
 
 testGen :: IO ASTExpression
-testGen = return $ permutation (mkQCGen 102323) testExpression
+testGen = editing (mkQCGen 1313) testExpression [0,1,2,3]
