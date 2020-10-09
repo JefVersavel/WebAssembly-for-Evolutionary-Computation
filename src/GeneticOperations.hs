@@ -120,5 +120,36 @@ subTreeMutation g1 e nrParam = do
     subTree <- generateSubTree g2 maxD nrParam
     return $ insertSubExpression p e subTree
 
-testGen :: Int -> IO ASTExpression
-testGen i = subTreeMutation (mkQCGen i) (BinOp Mul (UnOp Floor (Const 4) )(BinOp Add (Const 34) (UnOp Ceil (Param 4)))) 10
+reproduction :: ASTExpression -> ASTExpression
+reproduction = id
+
+permutation :: QCGen -> ASTExpression -> ASTExpression
+permutation g1 e = insertSubExpression point e permuted
+  where
+    (point, g2) = selectGenOpPoint g1 e
+    subTree = getSubExpression point e
+    permuted = permute g2 subTree
+
+permute :: QCGen -> ASTExpression -> ASTExpression
+permute _ (Const i) = Const i
+permute _ (Param p) = Param p
+permute _ (UnOp o e) = UnOp o e
+permute g (BinOp o e1 e2) = BinOp o e11 e22
+  where
+    (e11, e22) = switch g (e1, e2)
+permute g (RelOp o e1 e2) = RelOp o e11 e22
+  where
+    (e11, e22) = switch g (e1, e2)
+
+switch :: RandomGen g => g -> (a,a) -> (a,a)
+switch g (l, r)
+  | i == 0 = (l, r)
+  | otherwise = (r, l)
+  where
+    i = fst $ randomR (0,1) g :: Int
+
+testExpression :: ASTExpression
+testExpression = BinOp Mul (UnOp Floor (Const 4) )(BinOp Add (Const 34) (UnOp Ceil (Param 4)))
+
+testGen :: IO ASTExpression
+testGen = return $ permutation (mkQCGen 102323) testExpression
