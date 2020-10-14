@@ -144,3 +144,6 @@ getNrNodes (Param _      ) = 1
 getNrNodes (UnOp _ e     ) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
+
+size :: ASTExpression -> Int
+size = getNrNodes
