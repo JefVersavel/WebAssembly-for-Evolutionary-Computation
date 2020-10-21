@@ -108,8 +108,8 @@ writeFiles _ _ =
 removeAllFiles :: [FilePath] -> IO ()
 removeAllFiles = foldr ((>>) . removeFile) (return ())
 
-test :: IO [(ASTExpression, ByteString)]
+test :: IO [(ASTExpression, String)]
 test = do
   let params = [0.913487512345, 234.345, 34.12, 973456.2, -78764.2]
   exprs <- genASTExpressions 10 5 (length params) 0.5 6
-  serializeExpressions exprs params
+  createWasmFiles exprs params

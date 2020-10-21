@@ -10,7 +10,7 @@ import qualified Data.ByteString.Lazy          as LBS
 import qualified Data.ByteString               as BS
 import           WasmGenerator
 
-executeModule :: BS.ByteString -> IO (Aeson Double)
+executeModule :: BS.ByteString -> IO Double
 executeModule bytes = do
   session <- newSession defaultConfig
   let program = LBS.fromStrict bytes
@@ -24,10 +24,4 @@ executeModule bytes = do
     return Infinity;
   });
   |]
-  pure e
-
-testExec :: IO [Aeson Double]
-testExec = do
-  testList <- test
-  let bytesList = map snd testList
-  mapM executeModule bytesList
+  pure $ unAeson e
