@@ -164,7 +164,7 @@ executeSubTree :: ASTExpression -> [Double] -> IO Double
 executeSubTree e params = do
   serialized <- serializeExpression e params
   aeson      <- executeModule serialized
-  return $ unAeson aeson
+  return aeson
 
 testExpression :: ASTExpression
 testExpression =
