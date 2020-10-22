@@ -40,6 +40,13 @@ getSecondASTExpression (BinOp _ _ e) = Just e
 getSecondASTExpression (RelOp _ _ e) = Just e
 getSecondASTExpression _             = Nothing
 
+smallShow :: ASTExpression -> String
+smallShow (Const c    ) = "Const " ++ show c
+smallShow (Param d    ) = "Param" ++ show d
+smallShow (BinOp b _ _) = show b
+smallShow (UnOp u _   ) = show u
+smallShow (RelOp r _ _) = show r
+
 instance Show BinaryOperation where
   show Add      = " + "
   show Sub      = " - "
