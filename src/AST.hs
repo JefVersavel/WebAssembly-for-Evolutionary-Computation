@@ -1,7 +1,7 @@
 module AST where
 
-import           BinaryenTranslation
 import           Binaryen.Op
+import           BinaryenTranslation
 
 
 data ASTExpression =

@@ -1,23 +1,23 @@
-{-# LANGUAGE ScopedTypeVariables#-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module ALife_1 where
 
-import           Generators
-import           WasmGenerator
-import           ExecuteWasm
 import           AST
-import           Test.QuickCheck.Random
-import           Test.QuickCheck.Gen
-import           System.Random
-import           GeneticOperations
-import qualified Data.ByteString               as BS
+import qualified Data.ByteString        as BS
 import           Data.List
+import           ExecuteWasm
+import           Generators
+import           GeneticOperations
+import           System.Random
+import           Test.QuickCheck.Gen
+import           Test.QuickCheck.Random
+import           WasmGenerator
 
 
 data Organism = Organism {
   expression :: ASTExpression,
-  bytes :: BS.ByteString,
-  register :: Double
+  bytes      :: BS.ByteString,
+  register   :: Double
                          }
 
 instance Show Organism where
@@ -74,7 +74,7 @@ killFirst orgs ratio = drop n orgs
   where n = floor $ ratio * fromIntegral (length orgs)
 
 reproducable :: Organism -> Bool
-reproducable org = round (register org) `mod` 7 == 1
+reproducable org = round (register org) `mod` (7 :: Int) == 1
 
 reproduce :: [Organism] -> [Organism]
 reproduce orgs = orgs ++ [ org | org <- orgs, reproducable org ]

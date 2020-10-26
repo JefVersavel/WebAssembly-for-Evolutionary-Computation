@@ -9,7 +9,6 @@ import           Control.Exception
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Lazy          as LBS
 import           Language.JavaScript.Inline
-import           WasmGenerator
 
 executeModule :: BS.ByteString -> IO Double
 executeModule bytes =

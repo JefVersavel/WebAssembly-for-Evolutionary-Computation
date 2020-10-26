@@ -9,7 +9,6 @@ import           Seeding
 import           Control.Monad.Reader
 import           ExecuteWasm
 import           WasmGenerator
-import           Language.JavaScript.Inline
 
 getSubExpression :: Int -> ASTExpression -> ASTExpression
 getSubExpression 0 e          = e
@@ -115,12 +114,12 @@ pointMutation g1 e i = do
   l       = getRandomLeaf g2 i
 
 generateSubTree :: QCGen -> Int -> Int -> IO ASTExpression
-generateSubTree g1 maxD nrParam | grow      = generateExpression growOneInit
-                                | otherwise = generateExpression fullOneInit
+generateSubTree g1 maxD nrParam | grow      = generateExpr growOneInit
+                                | otherwise = generateExpr fullOneInit
  where
   (grow, g2) = randomR (True, False) g1
   (d   , g3) = randomR (0, maxD) g2
-  generateExpression method = generate $ runReader (method g3) (d, nrParam)
+  generateExpr method = generate $ runReader (method g3) (d, nrParam)
 
 subTreeMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
 subTreeMutation g1 e nrParam = do

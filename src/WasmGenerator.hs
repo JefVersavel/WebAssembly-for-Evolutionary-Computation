@@ -2,35 +2,21 @@
 
 module WasmGenerator where
 
-import           Generators
-import           Binaryen.Module                ( create
-                                                , Module
-                                                , addFunction
-                                                , addFunctionExport
-                                                )
-import           Binaryen.Expression            ( Expression
-                                                , constFloat64
-                                                , binary
-                                                , unary
-                                                )
 import           AST
-import           BinaryenTranslation
-import           Foreign
-import           Binaryen.Type                  ( none
-                                                , float64
-                                                )
-import           Binaryen.Index                 ( Index(Index) )
-import           Binaryen.Function              ( Function
-                                                , getName
-                                                )
+import           Binaryen.Expression (Expression, binary, constFloat64, unary)
+import           Binaryen.Function   (Function, getName)
+import           Binaryen.Index      (Index (Index))
+import           Binaryen.Module     (Module, addFunction, addFunctionExport,
+                                      create)
 import           Binaryen.Op
+import           Binaryen.Type       (float64, none)
+import           BinaryenTranslation
 import           BinaryenUtils
-import           Data.ByteString               as BS
-                                                ( writeFile
-                                                , ByteString
-                                                )
-import           System.Directory
+import           Data.ByteString     as BS (ByteString, writeFile)
+import           Foreign
+import           Generators
 import           Pool
+import           System.Directory
 
 generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
 generateExpression m _      (Const d       ) = constFloat64 m d
