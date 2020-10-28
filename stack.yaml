@@ -1,9 +1,8 @@
-resolver: lts-16.13
+resolver: lts-16.20
 
 extra-deps:
-  - 'binaryen-0.0.3.0'
-  - git: https://github.com/tweag/inline-js.git
-    commit: 6982abc9d3f71715c62f33b45ee8edf77e725dc3
+  - binaryen-0.0.3.0
+  - url: https://github.com/tweag/inline-js/archive/26c89ec30039445d6b3735cb58fda91b38400375.tar.gz
     subdirs:
       - inline-js-core
       - inline-js

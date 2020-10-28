@@ -16,7 +16,7 @@ executeModule bytes =
     let program = LBS.fromStrict bytes
     (e :: Aeson Double) <- eval
       session
-      [block|
+      [js|
   const typedArray = new Uint8Array($program);
   return WebAssembly.instantiate(typedArray).then(result => {
     return result.instance.exports.main();
@@ -24,4 +24,4 @@ executeModule bytes =
     return Infinity;
   });
   |]
-    pure $ unAeson e
+    evaluate $ unAeson e
