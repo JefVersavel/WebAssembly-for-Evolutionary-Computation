@@ -7,8 +7,14 @@ on:
 jobs:
 
   stack:
-    name: stack
-    runs-on: ubuntu-20.04
+    name: stack-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+          - macos-11.0
     steps:
 
       - name: setup-haskell
@@ -18,11 +24,17 @@ jobs:
           stack-version: 2.3.3
           enable-stack: true
 
-      - name: setup-deps
+      - name: setup-deps-ubuntu
+        if: matrix.os == 'ubuntu-20.04'
         run: |
           curl -L https://snapshot.debian.org/archive/debian/20200919T085932Z/pool/main/b/binaryen/binaryen_96-1_amd64.deb -o /tmp/binaryen.deb
           sudo dpkg -i /tmp/binaryen.deb
           rm /tmp/binaryen.deb
+
+      - name: setup-deps-macos
+        if: matrix.os == 'macos-11.0'
+        run: |
+          brew install https://raw.githubusercontent.com/Homebrew/homebrew-core/486a75c278923790b6f8eddb47fdf481a1741062/Formula/binaryen.rb
 
       - name: checkout
         uses: actions/checkout@v2
@@ -32,4 +44,5 @@ jobs:
           mkdir -p ~/.stack
           echo "system-ghc: true" > ~/.stack/config.yaml
 
-          stack -j2 test
+          mkdir src/tests
+          echo 'main "test"' | stack ghci
