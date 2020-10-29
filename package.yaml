@@ -27,6 +27,7 @@ dependencies:
   - inline-js
   - inline-js-core
   - directory
+  - primes
 
 ghc-options: -Wall
 

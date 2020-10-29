@@ -7,3 +7,5 @@ src/ghciTesting.hs
 *.wasm
 
 src/wasmJSTest.js
+
+*.swp

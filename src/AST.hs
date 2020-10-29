@@ -6,7 +6,6 @@ import           BinaryenTranslation
 
 data ASTExpression =
     Const Double |
-    -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
     Param Int |
     BinOp BinaryOperation ASTExpression ASTExpression |
     UnOp UnaryOperation ASTExpression |
