@@ -34,7 +34,9 @@ jobs:
       - name: setup-deps-macos
         if: matrix.os == 'macos-11.0'
         run: |
-          brew install https://raw.githubusercontent.com/Homebrew/homebrew-core/486a75c278923790b6f8eddb47fdf481a1741062/Formula/binaryen.rb
+          curl -L -o binaryen.rb https://raw.githubusercontent.com/Homebrew/homebrew-core/486a75c278923790b6f8eddb47fdf481a1741062/Formula/binaryen.rb
+          brew install ./binaryen.rb
+          rm binaryen.rb
 
       - name: checkout
         uses: actions/checkout@v2
