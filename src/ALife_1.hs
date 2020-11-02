@@ -17,7 +17,7 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import WasmGenerator
 
-data Organism = Organism
+data MVP = MVP
   { expression :: ASTExpression,
     bytes :: BS.ByteString,
     register :: Double
@@ -34,25 +34,25 @@ generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [Organism]
 generateInitPop gen d ratio n start = do
   expr <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
   serialized <- sequence [serializeExpression e [start] | e <- expr]
-  return [Organism e s start | (e, s) <- zip expr serialized]
+  return [MVP e s start | (e, s) <- zip expr serialized]
 
-executeOrganism :: Organism -> IO Organism
-executeOrganism (Organism e b _) = do
+executeMVP :: MVP -> IO MVP
+executeMVP (MVP e b _) = do
   outcome <- executeModule b
-  return $ Organism e b outcome
+  return $ MVP e b outcome
 
-executeOrganisms :: [Organism] -> IO [Organism]
-executeOrganisms orgs = sequence [executeOrganism org | org <- orgs]
+executeMVPs :: [MVP] -> IO [MVP]
+executeMVPs orgs = sequence [executeMVP org | org <- orgs]
 
-mutateOrganisms :: QCGen -> [Organism] -> Double -> IO [Organism]
-mutateOrganisms _ orgs 0 = return orgs
-mutateOrganisms gen orgs ratio = do
+mutateMVPs :: QCGen -> [MVP] -> Double -> IO [MVP]
+mutateMVPs _ orgs 0 = return orgs
+mutateMVPs gen orgs ratio = do
   let n = round $ ratio * fromIntegral (length orgs)
   let nextGen = fst $ split gen
   let indexes = take n $ nub $ randomRs (0, length orgs - 1) nextGen
   mutateOrgList gen orgs 0 indexes
 
-mutateOrgList :: QCGen -> [Organism] -> Int -> [Int] -> IO [Organism]
+mutateOrgList :: QCGen -> [MVP] -> Int -> [Int] -> IO [MVP]
 mutateOrgList _ orgs _ [] = return orgs
 mutateOrgList _ [] _ _ = return []
 mutateOrgList gen (o : os) index (i : is)
@@ -61,7 +61,7 @@ mutateOrgList gen (o : os) index (i : is)
     expr <- subTreeMutation gen (expression o) 1
     rest <- mutateOrgList (fst $ split gen) os (index + 1) is
     serialized <- serializeExpression expr [reg]
-    return $ Organism expr serialized reg : rest
+    return $ MVP expr serialized reg : rest
   | index > i = do
     rest <- mutateOrgList gen os (index + 1) is
     return $ o : rest
@@ -69,7 +69,7 @@ mutateOrgList gen (o : os) index (i : is)
     rest <- mutateOrgList gen os (index + 1) (i : is)
     return $ o : rest
 
-killRandom :: [Organism] -> QCGen -> [Organism]
+killRandom :: [MVP] -> QCGen -> [MVP]
 killRandom [] _ = []
 killRandom [o] _ = [o]
 killRandom (o : os) gen
@@ -78,18 +78,18 @@ killRandom (o : os) gen
   where
     (kill :: Bool, nextGen) = random gen
 
-killFirst :: [Organism] -> Double -> [Organism]
+killFirst :: [MVP] -> Double -> [MVP]
 killFirst orgs ratio = drop n orgs
   where
     n = floor $ ratio * fromIntegral (length orgs)
 
-reproducable :: Organism -> Bool
+reproducable :: MVP -> Bool
 reproducable org = mod (round (register org) :: Int) 13 == 0
 
-reproduce :: [Organism] -> [Organism]
+reproduce :: [MVP] -> [MVP]
 reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
 
-run :: [Organism] -> QCGen -> Double -> Int -> Int -> IO [[Organism]]
+run :: [MVP] -> QCGen -> Double -> Int -> Int -> IO [[MVP]]
 run orgs _ _ _ 0 = do
   print 0
   print orgs
@@ -98,8 +98,8 @@ run orgs gen ratio m n = do
   print n
   print orgs
   let (g1, g2) = split gen
-  executed <- executeOrganisms orgs
-  mutated <- mutateOrganisms g1 executed ratio
+  executed <- executeMVPs orgs
+  mutated <- mutateMVPs g1 executed ratio
   let (g11, g22) = split g2
   if length mutated > m
     then do
@@ -111,7 +111,7 @@ run orgs gen ratio m n = do
       nonKilledRun <- run nonKilled g22 ratio m (n - 1)
       return $ orgs : nonKilledRun
 
-orgListToString :: [[Organism]] -> String
+orgListToString :: [[MVP]] -> String
 orgListToString [] = ""
 orgListToString (x : xs) = show x ++ "\n" ++ orgListToString xs
 
