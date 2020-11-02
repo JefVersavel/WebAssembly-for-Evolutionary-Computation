@@ -7,10 +7,11 @@ import AST
 import ASTRepresentation
 import qualified Data.ByteString as BS
 import Data.List
-import Data.Numbers.Primes
+--import Data.Numbers.Primes
 import ExecuteWasm
 import Generators
 import GeneticOperations
+import GraphicalAnalysis
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -24,7 +25,10 @@ data Organism = Organism
 
 instance Show Organism where
   show (Organism e _ r) =
-    show (generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+    show (show e) ++ ", register= " ++ show r ++ "\n"
+
+orgListToExprs :: [[Organism]] -> [[ASTExpression]]
+orgListToExprs = map (map expression)
 
 generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [Organism]
 generateInitPop gen d ratio n start = do
@@ -114,6 +118,8 @@ orgListToString (x : xs) = show x ++ "\n" ++ orgListToString xs
 main :: String -> IO ()
 main name = do
   orgs <- generateInitPop (mkQCGen 10) 5 0.5 10 4
-  finalOrgs <- run orgs (mkQCGen 10) 0.5 10 100
+  finalOrgs <- run orgs (mkQCGen 10) 0.5 10 10
+  let exprs = orgListToExprs finalOrgs
+  mainchart exprs
   let path = "./src/tests/" ++ name
   writeFile path (orgListToString finalOrgs)

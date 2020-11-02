@@ -9,3 +9,5 @@ src/ghciTesting.hs
 src/wasmJSTest.js
 
 *.swp
+
+src/tests/

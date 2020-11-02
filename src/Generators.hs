@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module Generators where
 
 import AST

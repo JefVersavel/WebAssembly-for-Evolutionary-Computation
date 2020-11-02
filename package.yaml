@@ -28,6 +28,9 @@ dependencies:
   - inline-js-core
   - directory
   - primes
+  - Chart
+  - Chart-cairo
+  - cairo
 
 ghc-options: -Wall
 

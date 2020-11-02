@@ -1,6 +1,6 @@
 module ASTRepresentation where
 
-import           AST
+import AST
 
 type Depth = Int
 

@@ -1,6 +1,12 @@
 resolver: lts-16.20
 
+packages:
+  - .
+
 extra-deps:
+  - Chart-cairo-1.9.3
+  - cairo-0.13.8.1
+  - gtk2hs-buildtools-0.13.8.0
   - binaryen-0.0.3.0
   - url: https://github.com/tweag/inline-js/archive/26c89ec30039445d6b3735cb58fda91b38400375.tar.gz
     subdirs:
