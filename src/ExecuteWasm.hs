@@ -12,7 +12,7 @@ import           Language.JavaScript.Inline
 
 executeModule :: BS.ByteString -> IO Double
 executeModule bytes =
-  bracket (newSession defaultConfig) killSession $ \session -> do
+  withSession defaultConfig $ \session -> do
     let program = LBS.fromStrict bytes
     (e :: Aeson Double) <- eval
       session
