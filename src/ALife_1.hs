@@ -8,10 +8,13 @@ import ASTRepresentation
 import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
+
+import qualified Data.Text as T
 import ExecuteWasm
 import Generators
 import GeneticOperations
 import GraphicalAnalysis
+import Organism
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -23,14 +26,21 @@ data MVP = MVP
     register :: Double
   }
 
-instance Show Organism where
-  show (Organism e _ r) =
-    show (show e) ++ ", register= " ++ show r ++ "\n"
+instance Organism MVP where
+  genotype mvp = firstOp ++ "." ++ show (size $ expression mvp) ++ "." ++ show (getMaxDepth $ expression mvp)
+    where
+      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
 
-orgListToExprs :: [[Organism]] -> [[ASTExpression]]
+instance Show MVP where
+  show (MVP e _ r) =
+    show (generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+
+type GenotypePop = [(String, Int)]
+
+orgListToExprs :: [[MVP]] -> [[ASTExpression]]
 orgListToExprs = map (map expression)
 
-generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [Organism]
+generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [MVP]
 generateInitPop gen d ratio n start = do
   expr <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
   serialized <- sequence [serializeExpression e [start] | e <- expr]
@@ -91,7 +101,7 @@ reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
 
 run :: [MVP] -> QCGen -> Double -> Int -> Int -> IO [[MVP]]
 run orgs _ _ _ 0 = do
-  print 0
+  print (0::Int)
   print orgs
   return [orgs]
 run orgs gen ratio m n = do
@@ -114,6 +124,8 @@ run orgs gen ratio m n = do
 orgListToString :: [[MVP]] -> String
 orgListToString [] = ""
 orgListToString (x : xs) = show x ++ "\n" ++ orgListToString xs
+
+
 
 main :: String -> IO ()
 main name = do
