@@ -11,3 +11,5 @@ src/wasmJSTest.js
 *.swp
 
 src/tests/
+
+*.png
