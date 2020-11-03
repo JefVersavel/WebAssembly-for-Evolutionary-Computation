@@ -9,6 +9,7 @@ import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
 
+import qualified Data.Map as M
 import qualified Data.Text as T
 import ExecuteWasm
 import Generators
@@ -27,7 +28,12 @@ data MVP = MVP
   }
 
 instance Organism MVP where
-  genotype mvp = firstOp ++ "." ++ show (size $ expression mvp) ++ "." ++ show (getMaxDepth $ expression mvp)
+  genotype mvp =
+    firstOp
+      ++ "."
+      ++ show (size $ expression mvp)
+      ++ "."
+      ++ show (getMaxDepth $ expression mvp)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
 
@@ -101,7 +107,7 @@ reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
 
 run :: [MVP] -> QCGen -> Double -> Int -> Int -> IO [[MVP]]
 run orgs _ _ _ 0 = do
-  print (0::Int)
+  print (0 :: Int)
   print orgs
   return [orgs]
 run orgs gen ratio m n = do
@@ -121,17 +127,25 @@ run orgs gen ratio m n = do
       nonKilledRun <- run nonKilled g22 ratio m (n - 1)
       return $ orgs : nonKilledRun
 
-orgListToString :: [[MVP]] -> String
-orgListToString [] = ""
-orgListToString (x : xs) = show x ++ "\n" ++ orgListToString xs
+fancyShowList :: Show a => [[a]] -> String
+fancyShowList [] = ""
+fancyShowList (x : xs) = show x ++ "\n" ++ fancyShowList xs
 
+countGeno :: Organism a => [a] -> M.Map String Int
+countGeno =
+  foldr
+    (\o -> M.unionWith (+) (M.fromList [(genotype o, 1)]))
+    M.empty
 
+countGenotypes :: Organism a => [[a]] -> [[(String, Int)]]
+countGenotypes = map (M.toList . countGeno)
 
 main :: String -> IO ()
 main name = do
   orgs <- generateInitPop (mkQCGen 10) 5 0.5 10 4
   finalOrgs <- run orgs (mkQCGen 10) 0.5 10 10
   let exprs = orgListToExprs finalOrgs
+  print $ fancyShowList $ countGenotypes finalOrgs
   mainchart exprs
   let path = "./src/tests/" ++ name
-  writeFile path (orgListToString finalOrgs)
+  writeFile path (fancyShowList finalOrgs)
