@@ -1,7 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module AST where
 
 import Binaryen.Op
 import BinaryenTranslation
+import Data.Serialize
+import GHC.Generics
 
 data ASTExpression
   = Const Double
@@ -9,15 +13,24 @@ data ASTExpression
   | BinOp BinaryOperation ASTExpression ASTExpression
   | UnOp UnaryOperation ASTExpression
   | RelOp RelationalOperation ASTExpression ASTExpression
+  deriving (Generic)
+
+instance Serialize ASTExpression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize BinaryOperation
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize UnaryOperation
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize RelationalOperation
 
 getConstVal :: ASTExpression -> Maybe Double
 getConstVal (Const i) = Just i

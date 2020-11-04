@@ -33,6 +33,7 @@ dependencies:
   - cairo
   - containers
   - text
+  - cereal
 
 ghc-options: -Wall
 

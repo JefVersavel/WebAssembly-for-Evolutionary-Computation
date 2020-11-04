@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -8,10 +9,11 @@ import ASTRepresentation
 import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
-
 import qualified Data.Map as M
+import Data.Serialize
 import qualified Data.Text as T
 import ExecuteWasm
+import GHC.Generics
 import Generators
 import GeneticOperations
 import GraphicalAnalysis
@@ -27,12 +29,30 @@ data MVP = MVP
     register :: Double
   }
 
+data ShortMVP = ShortMVP
+  { expr :: ASTExpression,
+    reg :: Double
+  }
+  deriving (Generic)
+
+instance Serialize ShortMVP where
+
+instance Organism ShortMVP where
+  genotype mvp =
+    firstOp
+      ++ "_"
+      ++ show (size $ expr mvp)
+      ++ "_"
+      ++ show (getMaxDepth $ expr mvp)
+    where
+      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expr mvp
+
 instance Organism MVP where
   genotype mvp =
     firstOp
-      ++ "."
+      ++ "_"
       ++ show (size $ expression mvp)
-      ++ "."
+      ++ "_"
       ++ show (getMaxDepth $ expression mvp)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
@@ -145,7 +165,9 @@ main name = do
   orgs <- generateInitPop (mkQCGen 10) 5 0.5 10 4
   finalOrgs <- run orgs (mkQCGen 10) 0.5 10 10
   let exprs = orgListToExprs finalOrgs
-  print $ fancyShowList $ countGenotypes finalOrgs
+  let genos = countGenotypes finalOrgs
+  print $ fancyShowList genos
+  makeBarChart (last genos) $ name ++ "Bar"
   mainchart exprs
   let path = "./src/tests/" ++ name
   writeFile path (fancyShowList finalOrgs)
