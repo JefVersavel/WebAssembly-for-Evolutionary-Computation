@@ -39,6 +39,9 @@ data ShortMVP = ShortMVP
   }
   deriving (Generic)
 
+mvpToShort :: MVP -> ShortMVP
+mvpToShort (MVP e _ r) = ShortMVP e r
+
 instance Serialize ShortMVP
 
 instance Organism ShortMVP where
@@ -72,9 +75,9 @@ orgListToExprs = map (map expression)
 
 generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [MVP]
 generateInitPop gen d ratio n start = do
-  expr <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
-  serialized <- sequence [serializeExpression e [start] | e <- expr]
-  return [MVP e s start | (e, s) <- zip expr serialized]
+  ex <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
+  serialized <- sequence [serializeExpression e [start] | e <- ex]
+  return [MVP e s start | (e, s) <- zip ex serialized]
 
 executeMVP :: MVP -> IO MVP
 executeMVP (MVP e b _) = do
@@ -97,11 +100,11 @@ mutateOrgList _ orgs _ [] = return orgs
 mutateOrgList _ [] _ _ = return []
 mutateOrgList gen (o : os) index (i : is)
   | index == i = do
-    let reg = register o
-    expr <- subTreeMutation gen (expression o) 1
+    let r = register o
+    e <- subTreeMutation gen (expression o) 1
     rest <- mutateOrgList (fst $ split gen) os (index + 1) is
-    serialized <- serializeExpression expr [reg]
-    return $ MVP expr serialized reg : rest
+    serialized <- serializeExpression e [r]
+    return $ MVP e serialized r : rest
   | index > i = do
     rest <- mutateOrgList gen os (index + 1) is
     return $ o : rest
@@ -164,13 +167,12 @@ countGeno =
 countGenotypes :: Organism a => [[a]] -> [[(String, Int)]]
 countGenotypes = map (M.toList . countGeno)
 
-createPieCharts :: [[MVP]] -> String -> IO ()
+createPieCharts :: Organism a => [[a]] -> String -> IO ()
 createPieCharts orgs name = do
+  let genos = countGenotypes orgs
   let path = barChartPath ++ name ++ "Dir/"
   createDirectoryIfMissing True path
   makePieCharts genos $ path ++ name
-  where
-    genos = countGenotypes orgs
 
 main :: String -> IO ()
 main name = do
