@@ -29,7 +29,9 @@ pie values name =
       pie_plot . pie_data .= map pitem values
 
 makePieCharts :: [[(String, Int)]] -> String -> IO ()
-makePieCharts list name = forM_ [1 .. length list] $ \i -> pie (prepare $ list !! (i -1)) (name ++ show i)
+makePieCharts list name =
+  forM_ [1 .. length list] $ 
+    \i -> pie (prepare $ list !! (i -1)) (name ++ show i ++ ".png")
 
 mainchart :: [[ASTExpression]] -> IO ()
 mainchart exprs = toFile def "./example.png" $ do

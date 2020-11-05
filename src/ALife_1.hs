@@ -5,11 +5,10 @@
 module ALife_1 where
 
 import AST
-import ASTRepresentation
+import qualified ASTRepresentation as Rep
 import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
-import qualified Data.Map as M
 import Data.Serialize
 import qualified Data.Text as T
 import ExecuteWasm
@@ -18,14 +17,10 @@ import Generators
 import GeneticOperations
 import GraphicalAnalysis
 import Organism
-import System.Directory
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import WasmGenerator
-
-barChartPath :: String
-barChartPath = "./graphics/barcharts/"
 
 data MVP = MVP
   { expression :: ASTExpression,
@@ -66,14 +61,14 @@ instance Organism MVP where
 
 instance Show MVP where
   show (MVP e _ r) =
-    show (generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
 orgListToExprs :: [[MVP]] -> [[ASTExpression]]
 orgListToExprs = map (map expression)
 
-generateInitPop :: QCGen -> Int -> Double -> Int -> Double -> IO [MVP]
+generateInitPop :: QCGen -> Depth -> Ratio -> Size -> Double -> IO [MVP]
 generateInitPop gen d ratio n start = do
   ex <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
   serialized <- sequence [serializeExpression e [start] | e <- ex]
@@ -132,12 +127,15 @@ reproducable org = mod (round (register org) :: Int) 13 == 0
 reproduce :: [MVP] -> [MVP]
 reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
 
-run :: [MVP] -> QCGen -> Double -> Int -> Int -> IO [[MVP]]
-run orgs _ _ _ 0 = do
+run :: [MVP] -> QCGen -> Ratio -> Int -> IO [[MVP]]
+run orgs gen ratio m = run' orgs gen ratio m m
+
+run' :: [MVP] -> QCGen -> Ratio -> Int -> Int -> IO [[MVP]]
+run' orgs _ _ _ 0 = do
   print (0 :: Int)
   print orgs
   return [orgs]
-run orgs gen ratio m n = do
+run' orgs gen ratio m n = do
   print n
   print orgs
   let (g1, g2) = split gen
@@ -147,39 +145,40 @@ run orgs gen ratio m n = do
   if length mutated > m
     then do
       let killed = reproduce $ killRandom mutated g11
-      killedRun <- run killed g22 ratio m (n - 1)
+      killedRun <- run' killed g22 ratio m (n - 1)
       return $ orgs : killedRun
     else do
       let nonKilled = reproduce mutated
-      nonKilledRun <- run nonKilled g22 ratio m (n - 1)
+      nonKilledRun <- run' nonKilled g22 ratio m (n - 1)
       return $ orgs : nonKilledRun
 
-fancyShowList :: Show a => [[a]] -> String
-fancyShowList [] = ""
-fancyShowList (x : xs) = show x ++ "\n" ++ fancyShowList xs
+generateName :: Seed -> Depth -> Ratio -> Double -> Size -> Size -> Double -> String
+generateName seed d ratio mutationRatio s maxSize start =
+  "MVP_seed="
+    ++ show seed
+    ++ "_depth="
+    ++ show d
+    ++ "_ratio="
+    ++ show ratio
+    ++ "_size="
+    ++ show s
+    ++ "_maxSize="
+    ++ show maxSize
+    ++ "_mutationRatio="
+    ++ show mutationRatio
+    ++ "_start="
+    ++ show start
 
-countGeno :: Organism a => [a] -> M.Map String Int
-countGeno =
-  foldr
-    (\o -> M.unionWith (+) (M.fromList [(genotype o, 1)]))
-    M.empty
-
-countGenotypes :: Organism a => [[a]] -> [[(String, Int)]]
-countGenotypes = map (M.toList . countGeno)
-
-createPieCharts :: Organism a => [[a]] -> String -> IO ()
-createPieCharts orgs name = do
-  let genos = countGenotypes orgs
-  let path = barChartPath ++ name ++ "Dir/"
-  createDirectoryIfMissing True path
-  makePieCharts genos $ path ++ name
-
-main :: String -> IO ()
-main name = do
-  orgs <- generateInitPop (mkQCGen 10) 5 0.5 10 4
-  finalOrgs <- run orgs (mkQCGen 10) 0.5 10 10
+mainMVP :: Seed -> Depth -> Ratio -> Double -> Size -> Size -> Double -> IO ()
+mainMVP seed d ratio mutationRatio s maxSize start = do
+  let name = generateName seed d ratio mutationRatio s maxSize start
+  let (g1, g2) = split $ mkQCGen seed
+  orgs <- generateInitPop g1 d ratio s start
+  finalOrgs <- run orgs g2 mutationRatio maxSize
   let exprs = orgListToExprs finalOrgs
   createPieCharts finalOrgs name
   mainchart exprs
   let path = "./src/tests/" ++ name
   writeFile path (fancyShowList finalOrgs)
+
+testMVP = mainMVP 10 5 0.5 0.5 10 10 10
