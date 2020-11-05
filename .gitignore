@@ -13,3 +13,5 @@ src/wasmJSTest.js
 src/tests/
 
 *.png
+
+graphics/barcharts/firstbartestDir/

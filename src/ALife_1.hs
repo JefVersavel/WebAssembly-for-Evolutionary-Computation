@@ -18,10 +18,14 @@ import Generators
 import GeneticOperations
 import GraphicalAnalysis
 import Organism
+import System.Directory
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import WasmGenerator
+
+barChartPath :: String
+barChartPath = "./graphics/barcharts/"
 
 data MVP = MVP
   { expression :: ASTExpression,
@@ -35,7 +39,7 @@ data ShortMVP = ShortMVP
   }
   deriving (Generic)
 
-instance Serialize ShortMVP where
+instance Serialize ShortMVP
 
 instance Organism ShortMVP where
   genotype mvp =
@@ -160,14 +164,20 @@ countGeno =
 countGenotypes :: Organism a => [[a]] -> [[(String, Int)]]
 countGenotypes = map (M.toList . countGeno)
 
+createPieCharts :: [[MVP]] -> String -> IO ()
+createPieCharts orgs name = do
+  let path = barChartPath ++ name ++ "Dir/"
+  createDirectoryIfMissing True path
+  makePieCharts genos $ path ++ name
+  where
+    genos = countGenotypes orgs
+
 main :: String -> IO ()
 main name = do
   orgs <- generateInitPop (mkQCGen 10) 5 0.5 10 4
   finalOrgs <- run orgs (mkQCGen 10) 0.5 10 10
   let exprs = orgListToExprs finalOrgs
-  let genos = countGenotypes finalOrgs
-  print $ fancyShowList genos
-  makeBarChart (last genos) $ name ++ "Bar"
+  createPieCharts finalOrgs name
   mainchart exprs
   let path = "./src/tests/" ++ name
   writeFile path (fancyShowList finalOrgs)

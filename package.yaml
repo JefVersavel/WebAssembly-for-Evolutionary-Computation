@@ -34,6 +34,8 @@ dependencies:
   - containers
   - text
   - cereal
+  - plots
+  - diagrams
 
 ghc-options: -Wall
 
