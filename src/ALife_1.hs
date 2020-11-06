@@ -13,10 +13,12 @@ import Data.Serialize
 import qualified Data.Text as T
 import ExecuteWasm
 import GHC.Generics
+import GeneralUtils
 import Generators
 import GeneticOperations
 import GraphicalAnalysis
 import Organism
+import SerializeUtils
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -33,9 +35,6 @@ data ShortMVP = ShortMVP
     reg :: Double
   }
   deriving (Generic)
-
-mvpToShort :: MVP -> ShortMVP
-mvpToShort (MVP e _ r) = ShortMVP e r
 
 instance Serialize ShortMVP
 
@@ -63,7 +62,22 @@ instance Show MVP where
   show (MVP e _ r) =
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
 
+instance Show ShortMVP where
+  show (ShortMVP e r) =
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+
 type GenotypePop = [(String, Int)]
+
+data MVPRun = MVPRun Seed Depth Ratio Double Size Size Double [[ShortMVP]]
+  deriving (Generic, Show)
+
+instance Serialize MVPRun
+
+mvpToShort :: MVP -> ShortMVP
+mvpToShort (MVP e _ r) = ShortMVP e r
+
+shortenListList :: [[MVP]] -> [[ShortMVP]]
+shortenListList mvps = [map mvpToShort list | list <- mvps]
 
 orgListToExprs :: [[MVP]] -> [[ASTExpression]]
 orgListToExprs = map (map expression)
@@ -178,6 +192,10 @@ mainMVP seed d ratio mutationRatio s maxSize start = do
   let exprs = orgListToExprs finalOrgs
   createPieCharts finalOrgs name
   mainchart exprs
+  let runs = MVPRun seed d ratio mutationRatio s maxSize start $ shortenListList finalOrgs
+  encodeRun runs name
+  decodedRuns <- decodeRun name :: IO MVPRun
+  print decodedRuns
   let path = "./src/tests/" ++ name
   writeFile path (fancyShowList finalOrgs)
 

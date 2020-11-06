@@ -30,7 +30,7 @@ pie values name =
 
 makePieCharts :: [[(String, Int)]] -> String -> IO ()
 makePieCharts list name =
-  forM_ [1 .. length list] $ 
+  forM_ [1 .. length list] $
     \i -> pie (prepare $ list !! (i -1)) (name ++ show i ++ ".png")
 
 mainchart :: [[ASTExpression]] -> IO ()

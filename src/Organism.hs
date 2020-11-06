@@ -10,10 +10,6 @@ class Organism a where
 chartPath :: String
 chartPath = "./graphics/charts/"
 
-fancyShowList :: Show a => [[a]] -> String
-fancyShowList [] = ""
-fancyShowList (x : xs) = show x ++ "\n" ++ fancyShowList xs
-
 countGeno :: Organism a => [a] -> M.Map String Int
 countGeno =
   foldr
