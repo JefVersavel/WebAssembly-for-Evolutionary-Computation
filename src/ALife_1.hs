@@ -18,6 +18,7 @@ import Generators
 import GeneticOperations
 import GraphicalAnalysis
 import Organism
+import Run
 import SerializeUtils
 import System.Random
 import Test.QuickCheck.Gen
@@ -72,6 +73,26 @@ data MVPRun = MVPRun Seed Depth Ratio Double Size Size Double [[ShortMVP]]
   deriving (Generic, Show)
 
 instance Serialize MVPRun
+
+instance Run MVPRun where
+  getName (MVPRun seed d ratio mutationRatio s maxSize start _) =
+    "MVP_seed="
+      ++ show seed
+      ++ "_depth="
+      ++ show d
+      ++ "_ratio="
+      ++ show ratio
+      ++ "_size="
+      ++ show s
+      ++ "_maxSize="
+      ++ show maxSize
+      ++ "_mutationRatio="
+      ++ show mutationRatio
+      ++ "_start="
+      ++ show start
+
+getOrgList :: MVPRun -> [[ShortMVP]]
+getOrgList (MVPRun _ _ _ _ _ _ _ orgs) = orgs
 
 mvpToShort :: MVP -> ShortMVP
 mvpToShort (MVP e _ r) = ShortMVP e r
@@ -166,36 +187,19 @@ run' orgs gen ratio m n = do
       nonKilledRun <- run' nonKilled g22 ratio m (n - 1)
       return $ orgs : nonKilledRun
 
-generateName :: Seed -> Depth -> Ratio -> Double -> Size -> Size -> Double -> String
-generateName seed d ratio mutationRatio s maxSize start =
-  "MVP_seed="
-    ++ show seed
-    ++ "_depth="
-    ++ show d
-    ++ "_ratio="
-    ++ show ratio
-    ++ "_size="
-    ++ show s
-    ++ "_maxSize="
-    ++ show maxSize
-    ++ "_mutationRatio="
-    ++ show mutationRatio
-    ++ "_start="
-    ++ show start
-
 mainMVP :: Seed -> Depth -> Ratio -> Double -> Size -> Size -> Double -> IO ()
 mainMVP seed d ratio mutationRatio s maxSize start = do
-  let name = generateName seed d ratio mutationRatio s maxSize start
   let (g1, g2) = split $ mkQCGen seed
   orgs <- generateInitPop g1 d ratio s start
   finalOrgs <- run orgs g2 mutationRatio maxSize
   let exprs = orgListToExprs finalOrgs
-  createPieCharts finalOrgs name
-  mainchart exprs
   let runs = MVPRun seed d ratio mutationRatio s maxSize start $ shortenListList finalOrgs
-  encodeRun runs name
+  let name = getName runs
+  encodeRun runs
   decodedRuns <- decodeRun name :: IO MVPRun
   print decodedRuns
+  createPieCharts (getOrgList decodedRuns) (getName decodedRuns)
+  mainchart exprs
   let path = "./src/tests/" ++ name
   writeFile path (fancyShowList finalOrgs)
 
