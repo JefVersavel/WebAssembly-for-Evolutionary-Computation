@@ -1,22 +1,22 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables#-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module ExecuteWasm where
 
-import           Language.JavaScript.Inline
-import qualified Data.ByteString.Lazy          as LBS
+import           Control.Exception
 import qualified Data.ByteString               as BS
-import           WasmGenerator
+import qualified Data.ByteString.Lazy          as LBS
+import           Language.JavaScript.Inline
 
-executeModule :: BS.ByteString -> IO (Aeson Double)
-executeModule bytes = do
-  session <- newSession defaultConfig
-  let program = LBS.fromStrict bytes
-  (e :: Aeson Double) <- eval
-    session
-    [block|
+executeModule :: BS.ByteString -> IO Double
+executeModule bytes =
+  withSession defaultConfig $ \session -> do
+    let program = LBS.fromStrict bytes
+    (e :: Aeson Double) <- eval
+      session
+      [js|
   const typedArray = new Uint8Array($program);
   return WebAssembly.instantiate(typedArray).then(result => {
     return result.instance.exports.main();
@@ -24,10 +24,4 @@ executeModule bytes = do
     return Infinity;
   });
   |]
-  pure e
-
-testExec :: IO [Aeson Double]
-testExec = do
-  testList <- test
-  let bytesList = map snd testList
-  mapM executeModule bytesList
+    evaluate $ unAeson e

@@ -1,80 +1,97 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module AST where
 
-import           BinaryenTranslation
-import           Binaryen.Op
+import Binaryen.Op
+import BinaryenTranslation
+import Data.Serialize
+import GHC.Generics
 
+data ASTExpression
+  = Const Double
+  | Param Int
+  | BinOp BinaryOperation ASTExpression ASTExpression
+  | UnOp UnaryOperation ASTExpression
+  | RelOp RelationalOperation ASTExpression ASTExpression
+  deriving (Generic)
 
-data ASTExpression =
-    Const Double |
-    -- The integer represents the index of the parameter, will need to be generated based on the length of the list of parameters
-    Param Int |
-    BinOp BinaryOperation ASTExpression ASTExpression |
-    UnOp UnaryOperation ASTExpression |
-    RelOp RelationalOperation ASTExpression ASTExpression
+instance Serialize ASTExpression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-    deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize BinaryOperation
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-    deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize UnaryOperation
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-    deriving (Enum, Eq, Bounded)
+  deriving (Enum, Eq, Bounded,Generic)
+
+instance Serialize RelationalOperation
 
 getConstVal :: ASTExpression -> Maybe Double
 getConstVal (Const i) = Just i
-getConstVal _         = Nothing
+getConstVal _ = Nothing
 
 getIndex :: ASTExpression -> Maybe Int
 getIndex (Param i) = Just i
-getIndex _         = Nothing
+getIndex _ = Nothing
 
 getFirstASTExpression :: ASTExpression -> Maybe ASTExpression
 getFirstASTExpression (BinOp _ e _) = Just e
-getFirstASTExpression (UnOp _ e   ) = Just e
+getFirstASTExpression (UnOp _ e) = Just e
 getFirstASTExpression (RelOp _ e _) = Just e
-getFirstASTExpression _             = Nothing
+getFirstASTExpression _ = Nothing
 
 getSecondASTExpression :: ASTExpression -> Maybe ASTExpression
 getSecondASTExpression (BinOp _ _ e) = Just e
 getSecondASTExpression (RelOp _ _ e) = Just e
-getSecondASTExpression _             = Nothing
+getSecondASTExpression _ = Nothing
+
+smallShow :: ASTExpression -> String
+smallShow (Const c) = "Const " ++ show c
+smallShow (Param d) = "Param" ++ show d
+smallShow (BinOp b _ _) = show b
+smallShow (UnOp u _) = show u
+smallShow (RelOp r _ _) = show r
 
 instance Show BinaryOperation where
-  show Add      = " + "
-  show Sub      = " - "
-  show Mul      = " * "
-  show Div      = " / "
-  show Min      = " min "
-  show Max      = " max "
+  show Add = " + "
+  show Sub = " - "
+  show Mul = " * "
+  show Div = " / "
+  show Min = " min "
+  show Max = " max "
   show Copysign = " copysign "
 
 instance OperationTranslation BinaryOperation where
-  translateOp Add      = addFloat64
-  translateOp Sub      = subFloat64
-  translateOp Mul      = mulFloat64
-  translateOp Div      = divFloat64
-  translateOp Min      = minFloat64
-  translateOp Max      = maxFloat64
+  translateOp Add = addFloat64
+  translateOp Sub = subFloat64
+  translateOp Mul = mulFloat64
+  translateOp Div = divFloat64
+  translateOp Min = minFloat64
+  translateOp Max = maxFloat64
   translateOp Copysign = copySignFloat64
 
 instance Show UnaryOperation where
-  show Abs     = " abs "
-  show Neg     = " neg "
-  show Sqrt    = " sqrt "
-  show Ceil    = " ceil "
-  show Floor   = " floor "
-  show Trunc   = " trunc "
+  show Abs = " abs "
+  show Neg = " neg "
+  show Sqrt = " sqrt "
+  show Ceil = " ceil "
+  show Floor = " floor "
+  show Trunc = " trunc "
   show Nearest = " nearest "
 
-
 instance OperationTranslation UnaryOperation where
-  translateOp Abs     = absFloat64
-  translateOp Neg     = negFloat64
-  translateOp Sqrt    = sqrtFloat64
-  translateOp Ceil    = ceilFloat64
-  translateOp Floor   = floorFloat64
-  translateOp Trunc   = truncFloat64
+  translateOp Abs = absFloat64
+  translateOp Neg = negFloat64
+  translateOp Sqrt = sqrtFloat64
+  translateOp Ceil = ceilFloat64
+  translateOp Floor = floorFloat64
+  translateOp Trunc = truncFloat64
   translateOp Nearest = nearestFloat64
 
 instance Show RelationalOperation where
@@ -104,8 +121,7 @@ instance Eq ASTExpression where
   (RelOp r1 e11 e12) == (RelOp r2 e21 e22) =
     r1 == r2 && e11 == e21 && e12 == e22
   (UnOp u1 e1) == (UnOp u2 e2) = u1 == u2 && e1 == e2
-  _            == _            = False
-
+  _ == _ = False
 
 show' :: ASTExpression -> Int -> String
 show' _ d | d < 0 = error "The depth cannot be less than 0"
@@ -130,20 +146,22 @@ show' (RelOp r e1 e2) d =
     ++ show' e2 (d + 1)
     ++ ")"
 
-
 getMaxDepth :: ASTExpression -> Int
-getMaxDepth (Const _      ) = 0
-getMaxDepth (Param _      ) = 0
-getMaxDepth (UnOp _ e     ) = 1 + getMaxDepth e
+getMaxDepth (Const _) = 0
+getMaxDepth (Param _) = 0
+getMaxDepth (UnOp _ e) = 1 + getMaxDepth e
 getMaxDepth (BinOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 
 getNrNodes :: ASTExpression -> Int
-getNrNodes (Const _      ) = 1
-getNrNodes (Param _      ) = 1
-getNrNodes (UnOp _ e     ) = 1 + getNrNodes e
+getNrNodes (Const _) = 1
+getNrNodes (Param _) = 1
+getNrNodes (UnOp _ e) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 
 size :: ASTExpression -> Int
 size = getNrNodes
+
+averageSize :: [ASTExpression] -> Double
+averageSize exprs = fromIntegral (sum (map size exprs)) / fromIntegral (length exprs)

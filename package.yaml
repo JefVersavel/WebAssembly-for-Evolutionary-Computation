@@ -27,6 +27,15 @@ dependencies:
   - inline-js
   - inline-js-core
   - directory
+  - primes
+  - Chart
+  - Chart-cairo
+  - cairo
+  - containers
+  - text
+  - cereal
+  - plots
+  - diagrams
 
 ghc-options: -Wall
 
