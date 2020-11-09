@@ -2,9 +2,9 @@
 
 module Environment where
 
+import qualified Data.List as List
 import Data.Matrix
 import Data.Maybe
-import qualified Data.Set as Set
 import Organism
 import Seeding
 import System.Random
@@ -37,7 +37,7 @@ getOrg (Org o) = Just o
 getOrg _ = Nothing
 
 isOrg :: Organism a => Place a -> Bool
-isOrg (Org o) = True
+isOrg (Org _) = True
 isOrg _ = False
 
 isNil :: Organism a => Place a -> Bool
@@ -78,12 +78,13 @@ empty (mx, my) n
   | otherwise = error "the given limits must be positive and nonzero"
 
 distributeOrgs :: Organism a => QCGen -> [a] -> Pos -> IO [(Pos, a)]
-distributeOrgs gen orgs lim = distributeOrgs' gen orgs $ Set.fromList $ getAllPos lim
+distributeOrgs gen orgs lim = distributeOrgs' gen orgs $ getAllPos lim
 
-distributeOrgs' :: Organism a => QCGen -> [a] -> Set.Set Pos -> IO [(Pos, a)]
-distributeOrgs' gen (o : os) set = do
+distributeOrgs' :: Organism a => QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
+distributeOrgs' _ [] _ = return []
+distributeOrgs' gen (o : os) list = do
   let (g1, g2) = split gen
-  p <- generate $ useSeed g1 $ elements $ Set.toList set
-  let s = Set.delete p set
-  rest <- distributeOrgs' g2 os s
+  p <- generate $ useSeed g1 $ elements list
+  let l = List.delete p list
+  rest <- distributeOrgs' g2 os l
   return $ (p, o) : rest
