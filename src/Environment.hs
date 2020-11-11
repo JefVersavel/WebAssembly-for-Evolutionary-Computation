@@ -88,3 +88,14 @@ distributeOrgs' gen (o : os) list = do
   let l = List.delete p list
   rest <- distributeOrgs' g2 os l
   return $ (p, o) : rest
+
+fillInOrgs :: Organism a => Environment a -> [(Pos, a)] -> Environment a
+fillInOrgs env [] = env
+fillInOrgs env ((pos, org) : rst) = Env (setElem (Org org) pos m) n p
+  where
+    (Env m n p) = fillInOrgs env rst
+
+initializeEnvironment :: Organism a => Neighbourhood -> QCGen -> [a] -> Pos -> IO (Environment a)
+initializeEnvironment n gen orgList lim = do
+  posOrgs <- distributeOrgs gen orgList lim
+  return $ fillInOrgs (empty lim n) posOrgs
