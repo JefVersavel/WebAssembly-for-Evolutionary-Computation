@@ -6,3 +6,4 @@ stack.yaml.lock
 src/tests/
 graphics
 *.png
+serialized/
