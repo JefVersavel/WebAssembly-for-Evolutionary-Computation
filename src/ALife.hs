@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,6 +10,7 @@ import Data.List
 --import Data.Numbers.Primes
 import Data.Serialize
 import qualified Data.Text as T
+import Environment
 import ExecuteWasm
 import GHC.Generics
 import GeneralUtils
@@ -25,31 +25,13 @@ import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
 import WasmGenerator
 
-data MVP = MVP
+data Creature = Creature
   { expression :: ASTExpression,
     bytes :: BS.ByteString,
     register :: Double
   }
 
-data ShortMVP = ShortMVP
-  { expr :: ASTExpression,
-    reg :: Double
-  }
-  deriving (Generic)
-
-instance Serialize ShortMVP
-
-instance Organism ShortMVP where
-  genotype mvp =
-    firstOp
-      ++ "_"
-      ++ show (size $ expr mvp)
-      ++ "_"
-      ++ show (getMaxDepth $ expr mvp)
-    where
-      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expr mvp
-
-instance Organism MVP where
+instance Organism Creature where
   genotype mvp =
     firstOp
       ++ "_"
@@ -59,63 +41,36 @@ instance Organism MVP where
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
 
-instance Show MVP where
-  show (MVP e _ r) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
-
-instance Show ShortMVP where
-  show (ShortMVP e r) =
+instance Show Creature where
+  show (Creature e _ r) =
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
-data MVPRun = MVPRun Seed Depth Ratio Double Size Size Double [[ShortMVP]]
-  deriving (Generic, Show)
-
-instance Serialize MVPRun
-
-instance Run MVPRun where
-  getName (MVPRun seed d ratio mutationRatio s maxSize start _) =
-    "MVP_seed="
-      ++ show seed
-      ++ "_depth="
-      ++ show d
-      ++ "_ratio="
-      ++ show ratio
-      ++ "_size="
-      ++ show s
-      ++ "_maxSize="
-      ++ show maxSize
-      ++ "_mutationRatio="
-      ++ show mutationRatio
-      ++ "_start="
-      ++ show start
-
-getOrgList :: MVPRun -> [[ShortMVP]]
-getOrgList (MVPRun _ _ _ _ _ _ _ orgs) = orgs
-
-mvpToShort :: MVP -> ShortMVP
-mvpToShort (MVP e _ r) = ShortMVP e r
-
-shortenListList :: [[MVP]] -> [[ShortMVP]]
-shortenListList mvps = [map mvpToShort list | list <- mvps]
-
-orgListToExprs :: [[MVP]] -> [[ASTExpression]]
+orgListToExprs :: [[Creature]] -> [[ASTExpression]]
 orgListToExprs = map (map expression)
 
-generateInitPop :: QCGen -> Depth -> Ratio -> Size -> Double -> IO [MVP]
-generateInitPop gen d ratio n start = do
-  ex <- sequence [generate g | g <- rampedHalfNHalf gen d 1 ratio n]
-  serialized <- sequence [serializeExpression e [start] | e <- ex]
-  return [MVP e s start | (e, s) <- zip ex serialized]
+generateInitPop :: QCGen -> Double -> IO [Creature]
+generateInitPop gen start = do
+  let s = 10
+  let (g1, g2) = split gen
+  ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
+  let starts = generateStart g2 s start
+  serialized <- sequence [serializeExpression e [st] | (e, st) <- zip ex starts]
+  return [Creature e ser st | ((e, ser), st) <- zip (zip ex serialized) starts]
 
-executeMVP :: MVP -> IO MVP
-executeMVP (MVP e b _) = do
-  outcome <- executeModule b
-  return $ MVP e b outcome
+generateStart :: QCGen -> Size -> Double -> [Double]
+generateStart gen s start = take s $ randomRs (0, start) gen
 
-executeMVPs :: [MVP] -> IO [MVP]
-executeMVPs orgs = sequence [executeMVP org | org <- orgs]
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> IO (Environment Creature)
+initEnvironment gen n l s = do
+  let (g1, g2) = split gen
+  pop <- generateInitPop g1 s
+  initializeEnvironment n g2 pop l
+
+mutateEnvironment :: QCGen -> Environment Creature -> Ratio -> IO (Environment Creature)
+mutateEnvironment gen env ratio = do
+
 
 mutateMVPs :: QCGen -> [MVP] -> Double -> IO [MVP]
 mutateMVPs _ orgs 0 = return orgs
@@ -139,33 +94,26 @@ mutateOrgList gen (o : os) index (i : is)
     rest <- mutateOrgList gen os (index + 1) is
     return $ o : rest
   | otherwise = do
-    rest <- mutateOrgList gen os (index + 1) (i : is)
-    return $ o : rest
+    rest <- mutateOrgList g
 
-killRandom :: [MVP] -> QCGen -> [MVP]
-killRandom [] _ = []
-killRandom [o] _ = [o]
-killRandom (o : os) gen
-  | kill = killRandom os nextGen
-  | otherwise = o : killRandom os nextGen
-  where
-    (kill :: Bool, nextGen) = random gen
+executeCreature :: Creature -> IO Creature
+executeCreature (Creature e b _) = do
+  outcome <- executeModule b
+  return $ Creature e b outcome
 
-killFirst :: [MVP] -> Double -> [MVP]
-killFirst orgs ratio = drop n orgs
-  where
-    n = floor $ ratio * fromIntegral (length orgs)
+executeCreatures :: [Creature] -> IO [Creature]
+executeCreatures orgs = sequence [executeCreature org | org <- orgs]
 
-reproducable :: MVP -> Bool
+reproducable :: Creature -> Bool
 reproducable org = mod (round (register org) :: Int) 13 == 0
 
-reproduce :: [MVP] -> [MVP]
+reproduce :: [Creature] -> [Creature]
 reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
 
-run :: [MVP] -> QCGen -> Ratio -> Int -> IO [[MVP]]
+run :: [Creature] -> QCGen -> Ratio -> Int -> IO [[Creature]]
 run orgs gen ratio m = run' orgs gen ratio m m
 
-run' :: [MVP] -> QCGen -> Ratio -> Int -> Int -> IO [[MVP]]
+run' :: [Creature] -> QCGen -> Ratio -> Int -> Int -> IO [[Creature]]
 run' orgs _ _ _ 0 = do
   print (0 :: Int)
   print orgs
@@ -174,8 +122,8 @@ run' orgs gen ratio m n = do
   print n
   print orgs
   let (g1, g2) = split gen
-  executed <- executeMVPs orgs
-  mutated <- mutateMVPs g1 executed ratio
+  executed <- executeCreatures orgs
+  mutated <- mutateCreatures g1 executed ratio
   let (g11, g22) = split g2
   if length mutated > m
     then do
@@ -187,20 +135,10 @@ run' orgs gen ratio m n = do
       nonKilledRun <- run' nonKilled g22 ratio m (n - 1)
       return $ orgs : nonKilledRun
 
-mainMVP :: Seed -> Depth -> Ratio -> Double -> Size -> Size -> Double -> IO ()
-mainMVP seed d ratio mutationRatio s maxSize start = do
+mainCreature :: Seed -> Double -> Double -> IO ()
+mainCreature seed mutationRatio start = do
   let (g1, g2) = split $ mkQCGen seed
-  orgs <- generateInitPop g1 d ratio s start
-  finalOrgs <- run orgs g2 mutationRatio maxSize
-  let exprs = orgListToExprs finalOrgs
-  let runs = MVPRun seed d ratio mutationRatio s maxSize start $ shortenListList finalOrgs
-  let name = getName runs
-  encodeRun runs
-  decodedRuns <- decodeRun name :: IO MVPRun
-  print decodedRuns
-  createPieCharts (getOrgList decodedRuns) (getName decodedRuns)
-  mainchart exprs
-  let path = "./src/tests/" ++ name
-  writeFile path (fancyShowList finalOrgs)
+  orgs <- generateInitPop g1 start
+  return ()
 
-testMVP = mainMVP 10 5 0.5 0.5 10 10 10
+testCreature = mainCreature 10 5 0.5 0.5 10 10 10

@@ -15,21 +15,32 @@ type Resource = Double
 
 type Pos = (Int, Int)
 
+type Lim = Pos
+
 data Place a = Organism a => Nil | Org a | Res Resource
 
-data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Pos
+instance Show a => Show (Place a) where
+  show Nil = "Nil"
+  show (Org org) = show org
+  show (Res r) = "Res: " ++ show r
+
+data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Lim
+
+instance Show a => Show (Environment a) where
+  show (Env m _ _) = show m
 
 -- https://en.wikipedia.org/wiki/Moore_neighborhood
 -- https://en.wikipedia.org/wiki/Von_Neumann_neighborhood
 data Neighbourhood = Moore | VonNeumann
+  deriving (Show)
 
-legalPos :: Pos -> Pos -> Bool
+legalPos :: Pos -> Lim -> Bool
 legalPos (x, y) (mx, my) = x >= 1 && x <= mx && y >= 1 && y <= my
 
-legalLimits :: Pos -> Bool
+legalLimits :: Lim -> Bool
 legalLimits (x, y) = x >= 0 && y >= 0
 
-getAllPos :: Pos -> [Pos]
+getAllPos :: Lim -> [Pos]
 getAllPos (mx, my) = [(x, y) | x <- [1 .. mx], y <- [1 .. my]]
 
 getOrg :: Organism a => Place a -> Maybe a
@@ -44,6 +55,10 @@ isNil :: Organism a => Place a -> Bool
 isNil Nil = True
 isNil _ = False
 
+getOrgsAt :: Organism a => Environment a -> [Pos] -> a
+
+getOrgsAt env
+
 getplaceAt :: Organism a => Environment a -> Pos -> Maybe (Place a)
 getplaceAt (Env m _ maxPos) p
   | legalPos p maxPos = Just $ uncurry unsafeGet p m
@@ -55,6 +70,11 @@ nilGenerator _ = Nil
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt (Env m n lim) org p
   | legalPos p lim = Env (unsafeSet (Org org) p m) n lim
+  | otherwise = error "given position is not inbounds"
+
+deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a
+deleteOrganismAt (Env m n lim) p
+  | legalPos p lim = Env (unsafeSet Nil p m) n lim
   | otherwise = error "given position is not inbounds"
 
 adjacentPos :: Pos -> [Pos]
@@ -72,12 +92,12 @@ getNeighbours (Env _ VonNeumann lim) p =
 getAllOrgs :: Organism a => Environment a -> [a]
 getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
 
-empty :: Organism a => Pos -> Neighbourhood -> Environment a
+empty :: Organism a => Lim -> Neighbourhood -> Environment a
 empty (mx, my) n
   | legalLimits (mx, my) = Env (matrix mx my nilGenerator) n (mx, my)
   | otherwise = error "the given limits must be positive and nonzero"
 
-distributeOrgs :: Organism a => QCGen -> [a] -> Pos -> IO [(Pos, a)]
+distributeOrgs :: Organism a => QCGen -> [a] -> Lim -> IO [(Pos, a)]
 distributeOrgs gen orgs lim = distributeOrgs' gen orgs $ getAllPos lim
 
 distributeOrgs' :: Organism a => QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
@@ -91,11 +111,20 @@ distributeOrgs' gen (o : os) list = do
 
 fillInOrgs :: Organism a => Environment a -> [(Pos, a)] -> Environment a
 fillInOrgs env [] = env
-fillInOrgs env ((pos, org) : rst) = Env (setElem (Org org) pos m) n p
+fillInOrgs env ((pos, org) : rst) = insertOrganismAt env' org pos
   where
-    (Env m n p) = fillInOrgs env rst
+    env' = fillInOrgs env rst
 
-initializeEnvironment :: Organism a => Neighbourhood -> QCGen -> [a] -> Pos -> IO (Environment a)
+initializeEnvironment :: Organism a => Neighbourhood -> QCGen -> [a] -> Lim -> IO (Environment a)
 initializeEnvironment n gen orgList lim = do
   posOrgs <- distributeOrgs gen orgList lim
   return $ fillInOrgs (empty lim n) posOrgs
+
+generateRandomPositions :: QCGen -> Lim -> Int -> [Pos]
+generateRandomPositions gen l n = genRanPos gen l n n
+
+genRanPos :: QCGen -> Lim -> Int -> Int -> [Pos]
+genRanPos gen (mx, my) n m = (x, y) : genRanPos g2 (mx, my) n (m -1)
+  where
+    (x, g1) = randomR (0, mx) gen
+    (y, g2) = randomR (0, my) g1

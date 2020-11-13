@@ -4,7 +4,7 @@ import qualified Data.Map as M
 import GraphicalAnalysis
 import System.Directory
 
-class Organism a where
+class Show a => Organism a where
   genotype :: a -> String
 
 chartPath :: String
