@@ -21,8 +21,8 @@ data Place a = Organism a => Nil | Org a | Res Resource
 
 instance Show a => Show (Place a) where
   show Nil = "Nil"
-  show (Org org) = show org
-  show (Res r) = "Res: " ++ show r
+  show (Org org) = "Org"
+  show (Res r) = "Res"
 
 data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Lim
 
@@ -33,6 +33,18 @@ instance Show a => Show (Environment a) where
 -- https://en.wikipedia.org/wiki/Von_Neumann_neighborhood
 data Neighbourhood = Moore | VonNeumann
   deriving (Show)
+
+getLim :: Environment a -> Lim
+getLim (Env _ _ l) = l
+
+getXLim :: Environment a -> Int
+getXLim (Env _ _ (mx, _)) = mx
+
+getYLim :: Environment a -> Int
+getYLim (Env _ _ (_, my)) = my
+
+getSize :: Environment a -> Int
+getSize (Env _ _ (mx, my)) = mx * my
 
 legalPos :: Pos -> Lim -> Bool
 legalPos (x, y) (mx, my) = x >= 1 && x <= mx && y >= 1 && y <= my
@@ -51,13 +63,23 @@ isOrg :: Organism a => Place a -> Bool
 isOrg (Org _) = True
 isOrg _ = False
 
-isNil :: Organism a => Place a -> Bool
-isNil Nil = True
-isNil _ = False
+isNil :: Organism a => Environment a -> Pos -> Bool
+isNil env p = case getplaceAt env p of
+  Nothing -> False
+  Just pl -> case pl of
+    Nil -> True
+    _ -> False
 
-getOrgsAt :: Organism a => Environment a -> [Pos] -> a
-
-getOrgsAt env
+getOrgsAt :: Organism a => Environment a -> [Pos] -> [(Pos, a)]
+getOrgsAt _ [] = []
+getOrgsAt env (x : xs) = case place of
+  Just p ->
+    if isOrg p
+      then (x, fromJust (getOrg p)) : getOrgsAt env xs
+      else getOrgsAt env xs
+  Nothing -> getOrgsAt env xs
+  where
+    place = getplaceAt env x
 
 getplaceAt :: Organism a => Environment a -> Pos -> Maybe (Place a)
 getplaceAt (Env m _ maxPos) p
@@ -66,6 +88,9 @@ getplaceAt (Env m _ maxPos) p
 
 nilGenerator :: Organism a => Pos -> Place a
 nilGenerator _ = Nil
+
+nillify :: Organism a => Environment a -> [Pos] -> Environment a
+nillify = foldl deleteOrganismAt
 
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt (Env m n lim) org p
@@ -89,8 +114,17 @@ getNeighbours (Env _ Moore lim) p =
 getNeighbours (Env _ VonNeumann lim) p =
   [neighbour | neighbour <- adjacentPos p, legalPos neighbour lim]
 
+getNilNeighbours :: Organism a => Environment a -> Pos -> [Pos]
+getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
+
+selectPosition :: QCGen -> [Pos] -> IO Pos
+selectPosition gen positions = generate $ useSeed gen $ elements positions
+
 getAllOrgs :: Organism a => Environment a -> [a]
 getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
+
+getOrgsPos :: Organism a => Environment a -> [(Pos, a)]
+getOrgsPos env = getOrgsAt env $ getAllPos $ getLim env
 
 empty :: Organism a => Lim -> Neighbourhood -> Environment a
 empty (mx, my) n
@@ -120,11 +154,13 @@ initializeEnvironment n gen orgList lim = do
   posOrgs <- distributeOrgs gen orgList lim
   return $ fillInOrgs (empty lim n) posOrgs
 
-generateRandomPositions :: QCGen -> Lim -> Int -> [Pos]
-generateRandomPositions gen l n = genRanPos gen l n n
+generateRandomPositions :: Organism a => QCGen -> Environment a -> Int -> [Pos]
+generateRandomPositions gen env n = List.nub $ genRanPos gen env n n
 
-genRanPos :: QCGen -> Lim -> Int -> Int -> [Pos]
-genRanPos gen (mx, my) n m = (x, y) : genRanPos g2 (mx, my) n (m -1)
+genRanPos :: Organism a => QCGen -> Environment a -> Int -> Int -> [Pos]
+genRanPos gen env n m = (x, y) : genRanPos g2 env n (m -1)
   where
+    mx = getXLim env
+    my = getYLim env
     (x, g1) = randomR (0, mx) gen
     (y, g2) = randomR (0, my) g1
