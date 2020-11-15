@@ -19,9 +19,9 @@ type Lim = Pos
 
 data Place a = Organism a => Nil | Org a | Res Resource
 
-instance Show a => Show (Place a) where
+instance (Show a, Organism a) => Show (Place a) where
   show Nil = "Nil"
-  show (Org org) = "Org"
+  show (Org org) = genotype org
   show (Res r) = "Res"
 
 data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Lim
@@ -72,14 +72,12 @@ isNil env p = case getplaceAt env p of
 
 getOrgsAt :: Organism a => Environment a -> [Pos] -> [(Pos, a)]
 getOrgsAt _ [] = []
-getOrgsAt env (x : xs) = case place of
+getOrgsAt env (x : xs) = case getplaceAt env x of
   Just p ->
     if isOrg p
       then (x, fromJust (getOrg p)) : getOrgsAt env xs
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
-  where
-    place = getplaceAt env x
 
 getplaceAt :: Organism a => Environment a -> Pos -> Maybe (Place a)
 getplaceAt (Env m _ maxPos) p
@@ -155,12 +153,13 @@ initializeEnvironment n gen orgList lim = do
   return $ fillInOrgs (empty lim n) posOrgs
 
 generateRandomPositions :: Organism a => QCGen -> Environment a -> Int -> [Pos]
-generateRandomPositions gen env n = List.nub $ genRanPos gen env n n
+generateRandomPositions gen env n = take n $ List.nub $ genRanPos gen env
 
-genRanPos :: Organism a => QCGen -> Environment a -> Int -> Int -> [Pos]
-genRanPos gen env n m = (x, y) : genRanPos g2 env n (m -1)
+-- Creates infinite list of positions in the environment so be careful
+genRanPos :: Organism a => QCGen -> Environment a -> [Pos]
+genRanPos gen env = (x, y) : genRanPos g2 env
   where
     mx = getXLim env
     my = getYLim env
-    (x, g1) = randomR (0, mx) gen
-    (y, g2) = randomR (0, my) g1
+    (x, g1) = randomR (1, mx) gen
+    (y, g2) = randomR (1, my) g1

@@ -25,14 +25,15 @@ data Creature = Creature
   }
 
 instance Organism Creature where
-  genotype mvp =
-    firstOp
-      ++ "_"
-      ++ show (size $ expression mvp)
-      ++ "_"
-      ++ show (getMaxDepth $ expression mvp)
-    where
-      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
+  genotype creature = show $ reproducable creature
+
+-- firstOp
+--   ++ "_"
+--   ++ show (size $ expression mvp)
+--   ++ "_"
+--   ++ show (getMaxDepth $ expression mvp)
+-- where
+--   firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
 
 instance Show Creature where
   show (Creature e _ r) =
@@ -66,24 +67,18 @@ mutateEnvironment gen env ratio = do
   let (g1, g2) = split gen
   let amount = round (ratio * fromIntegral (Environment.getSize env) :: Double)
   let positions = generateRandomPositions g1 env amount
-  print "random positions"
   let creatures = getOrgsAt env positions
-  print "creatures"
   let orgs = map snd creatures
   let pos = map fst creatures
-  print $ length orgs
   mutated <- mutateCreatures g2 orgs
-  print "mutated"
   return $ fillInOrgs env (zip pos mutated)
 
 mutateCreatures :: QCGen -> [Creature] -> IO [Creature]
-mutateCreatures _ [] = print "last" >> return []
+mutateCreatures _ [] = return []
 mutateCreatures gen (o : os) = do
-  print o
   let (g1, g2) = split gen
   let r = register o
   e <- subTreeMutation g1 (expression o) 1
-  print "subtree"
   rest <- mutateCreatures g2 os
   serialized <- serializeExpression e [r]
   return $ Creature e serialized r : rest
@@ -106,7 +101,9 @@ killRandom gen env = nillify env positions
       generateRandomPositions gen env (round (0.5 * fromIntegral (Environment.getSize env) :: Double))
 
 reproduce :: QCGen -> Environment Creature -> IO (Environment Creature)
-reproduce gen env = reproduceList gen env $ getOrgsPos env
+reproduce gen env = do
+  let orgs = getOrgsPos env
+  reproduceList gen env orgs
 
 reproduceList :: QCGen -> Environment Creature -> [(Pos, Creature)] -> IO (Environment Creature)
 reproduceList _ env [] = return env
@@ -120,7 +117,9 @@ reproduceList gen env (o : os) = do
         if null nils
           then selectPosition g2 $ getNeighbours env pos
           else selectPosition g2 nils
-  insertOrganismAt rest creature <$> childPos
+  if reproducable creature
+    then insertOrganismAt rest creature <$> childPos
+    else return rest
 
 run :: Environment Creature -> QCGen -> Ratio -> Int -> IO [Environment Creature]
 run env _ _ 0 = do
@@ -133,25 +132,19 @@ run env gen ratio n = do
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
-  print orgs
+  -- print orgs
   let positions = map fst posOrg
   executed <- executeCreatures orgs
-  print "executed"
-  print executed
   let executedEnv = fillInOrgs env $ zip positions executed
-  print executedEnv
   mutatedEnv <- mutateEnvironment g1 executedEnv ratio
-  print mutatedEnv
   let (g11, g22) = split g2
   if length orgs > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
     then do
       let killedEnv = killRandom g11 mutatedEnv
-      print killedEnv
       killedRun <- run killedEnv g22 ratio (n - 1)
       return $ killedEnv : killedRun
     else do
       reproducedEnv <- reproduce g11 mutatedEnv
-      print reproducedEnv
       reproduceRun <- run reproducedEnv g22 ratio (n - 1)
       return $ reproducedEnv : reproduceRun
 
@@ -160,7 +153,6 @@ mainCreature seed mutationRatio start = do
   let (g1, g2) = split $ mkQCGen seed
   let lim = (5, 5)
   orgs <- generateInitPop g1 start lim
-  print orgs
   let (g11, g22) = split g2
   env <- initializeEnvironment Moore g11 orgs lim
   run env g22 mutationRatio 10
