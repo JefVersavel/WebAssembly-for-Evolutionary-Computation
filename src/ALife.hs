@@ -123,39 +123,59 @@ reproduceList gen env (o : os) = do
 
 run :: Environment Creature -> QCGen -> Ratio -> Int -> IO [Environment Creature]
 run env _ _ 0 = do
-  print (0 :: Int)
+  print "End"
   print env
   return [env]
 run env gen ratio n = do
-  print n
-  print env
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
-  -- print orgs
   let positions = map fst posOrg
-  executed <- executeCreatures orgs
-  let executedEnv = fillInOrgs env $ zip positions executed
-  mutatedEnv <- mutateEnvironment g1 executedEnv ratio
-  let (g11, g22) = split g2
-  if length orgs > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
-    then do
-      let killedEnv = killRandom g11 mutatedEnv
-      killedRun <- run killedEnv g22 ratio (n - 1)
-      return $ killedEnv : killedRun
-    else do
-      reproducedEnv <- reproduce g11 mutatedEnv
-      reproduceRun <- run reproducedEnv g22 ratio (n - 1)
-      return $ reproducedEnv : reproduceRun
+  let modulo = mod n 4
+  let nxt = n -1
+  case modulo of
+    0 ->
+      print "Reaper"
+        >> if length orgs > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
+          then do
+            let killedEnv = killRandom g1 env
+            print killedEnv
+            killedRun <- run killedEnv g2 ratio nxt
+            return $ killedEnv : killedRun
+          else do
+            print env
+            rest <- run env g2 ratio nxt
+            return $ env : rest
+    3 -> do
+      print "Execution"
+      executed <- executeCreatures orgs
+      let newEnv = fillInOrgs env $ zip positions executed
+      print newEnv
+      rest <- run newEnv g2 ratio nxt
+      return $ newEnv : rest
+    2 -> do
+      print "Mutation"
+      newEnv <- mutateEnvironment g1 env ratio
+      print newEnv
+      rest <- run newEnv g2 ratio nxt
+      return $ newEnv : rest
+    _ -> do
+      print "reproduction"
+      newEnv <- reproduce g1 env
+      print newEnv
+      rest <- run newEnv g2 ratio nxt
+      return $ newEnv : rest
 
-mainCreature :: Seed -> Double -> Double -> IO ()
-mainCreature seed mutationRatio start = do
+mainCreature :: Seed -> Double -> Double -> Int -> IO ()
+mainCreature seed mutationRatio start iterations = do
   let (g1, g2) = split $ mkQCGen seed
   let lim = (5, 5)
   orgs <- generateInitPop g1 start lim
   let (g11, g22) = split g2
   env <- initializeEnvironment Moore g11 orgs lim
-  run env g22 mutationRatio 10
+  print "Init"
+  print env
+  run env g22 mutationRatio (iterations * 4)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5
+testCreature = mainCreature 10 0.5 0.5 10
