@@ -33,9 +33,8 @@ dependencies:
   - cairo
   - containers
   - text
+  - matrix
   - cereal
-  - plots
-  - diagrams
 
 ghc-options: -Wall
 
