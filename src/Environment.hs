@@ -59,6 +59,14 @@ getOrg :: Organism a => Place a -> Maybe a
 getOrg (Org o) = Just o
 getOrg _ = Nothing
 
+getResource :: Place a -> Maybe Resource
+getResource (Res r) = Just r
+getResource _ = Nothing
+
+isResource :: Place a -> Bool
+isResource (Res _) = True
+isResource _ = False
+
 isOrg :: Organism a => Place a -> Bool
 isOrg (Org _) = True
 isOrg _ = False
@@ -79,10 +87,15 @@ getOrgsAt env (x : xs) = case getplaceAt env x of
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
-getplaceAt :: Organism a => Environment a -> Pos -> Maybe (Place a)
+getplaceAt :: Environment a -> Pos -> Maybe (Place a)
 getplaceAt (Env m _ maxPos) p
   | legalPos p maxPos = Just $ uncurry unsafeGet p m
   | otherwise = Nothing
+
+getResourceAt :: Environment a -> Pos -> Maybe Resource
+getResourceAt env pos = do
+  place <- getplaceAt env pos
+  getResource place
 
 nilGenerator :: Organism a => Pos -> Place a
 nilGenerator _ = Nil
@@ -147,7 +160,13 @@ fillInOrgs env ((pos, org) : rst) = insertOrganismAt env' org pos
   where
     env' = fillInOrgs env rst
 
-initializeEnvironment :: Organism a => Neighbourhood -> QCGen -> [a] -> Lim -> IO (Environment a)
+initializeEnvironment ::
+  Organism a =>
+  Neighbourhood ->
+  QCGen ->
+  [a] ->
+  Lim ->
+  IO (Environment a)
 initializeEnvironment n gen orgList lim = do
   posOrgs <- distributeOrgs gen orgList lim
   return $ fillInOrgs (empty lim n) posOrgs
