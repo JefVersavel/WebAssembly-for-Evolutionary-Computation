@@ -106,25 +106,15 @@ getOrgsAt env (x : xs) = case getplaceAt env x of
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
-getResource :: Place a -> Maybe Resource
-getResource (Res r) = Just r
-getResource _ = Nothing
-
-isResource :: Place a -> Bool
-isResource (Res _) = True
-isResource _ = False
+getplaceAt :: Environment a -> Pos -> Maybe (Place a)
+getplaceAt (Env m _ maxPos) p
+  | legalPos p maxPos = Just $ uncurry unsafeGet p m
+  | otherwise = Nothing
 
 getResourceAt :: Environment a -> Pos -> Maybe Resource
 getResourceAt env pos = do
   place <- getplaceAt env pos
   getResource place
-
-isNil :: Organism a => Environment a -> Pos -> Bool
-isNil env p = case getplaceAt env p of
-  Nothing -> False
-  Just pl -> case pl of
-    Nil -> True
-    _ -> False
 
 nilGenerator :: Organism a => Pos -> Place a
 nilGenerator _ = Nil
@@ -173,6 +163,12 @@ distributeOrgs' gen (o : os) list = do
   let l = List.delete p list
   rest <- distributeOrgs' g2 os l
   return $ (p, o) : rest
+
+fillInOrgs :: Organism a => Environment a -> [(Pos, a)] -> Environment a
+fillInOrgs env [] = env
+fillInOrgs env ((pos, org) : rst) = insertOrganismAt env' org pos
+  where
+    env' = fillInOrgs env rst
 
 initializeEnvironment ::
   Organism a =>
