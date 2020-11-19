@@ -8,7 +8,7 @@ import Data.Maybe
 import Organism
 import Seeding
 import System.Random
-import Test.QuickCheck
+import qualified Test.QuickCheck as QC
 import Test.QuickCheck.Random
 
 type Resource = Double
@@ -17,18 +17,24 @@ type Pos = (Int, Int)
 
 type Lim = Pos
 
-data Place a = Organism a => Nil | Org a | Res Resource
+-- | Reprents a lifeform in the environment,
+-- it can either be Nil which means that there is no life form in the cell or it can be an Organism.
+data Life a = Organism a => Nil | Org a
 
-instance (Show a, Organism a) => Show (Place a) where
+-- | Represents a cell in the environemnt with its lifeform and a list of resources that can be found in that cell.
+type Cell a = (Life a, [Resource])
+
+instance (Show a, Organism a) => Show (Life a) where
   show Nil = "Nil"
   show (Org org) = genotype org
-  show (Res r) = "Res"
 
-data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Lim
+-- | Represents the environment with cells and the neighbourhood and limits of the environment.
+data Environment a = Organism a => Env (Matrix (Cell a)) Neighbourhood Lim
 
 instance Show a => Show (Environment a) where
   show (Env m _ _) = show m
 
+-- | The neighbourhood of an environment which affects wich cells are neighbours of eachother.
 -- https://en.wikipedia.org/wiki/Moore_neighborhood
 -- https://en.wikipedia.org/wiki/Von_Neumann_neighborhood
 data Neighbourhood = Moore | VonNeumann
@@ -76,50 +82,70 @@ getNeighbours (Env _ Moore lim) p =
 getNeighbours (Env _ VonNeumann lim) p =
   [neighbour | neighbour <- adjacentPos p, legalPos neighbour lim]
 
-getplaceAt :: Environment a -> Pos -> Maybe (Place a)
-getplaceAt (Env m _ maxPos) p
+getCellAt :: Environment a -> Pos -> Maybe (Cell a)
+getCellAt (Env m _ maxPos) p
   | legalPos p maxPos = Just $ uncurry unsafeGet p m
   | otherwise = Nothing
 
-getOrg :: Organism a => Place a -> Maybe a
-getOrg (Org o) = Just o
+getOrg :: Organism a => Cell a -> Maybe a
+getOrg (Org o, _) = Just o
 getOrg _ = Nothing
 
-getResource :: Place a -> Maybe Resource
-getResource (Res r) = Just r
-getResource _ = Nothing
+getResources :: Cell a -> Maybe [Resource]
+getResources (_, r) = Just r
+getResources _ = Nothing
 
-isResource :: Place a -> Bool
-isResource (Res _) = True
-isResource _ = False
+containsResources :: Cell a -> Bool
+containsResources (_, r)
+  | null r = False
+  | otherwise = True
+containsResources _ = False
 
-isOrg :: Organism a => Place a -> Bool
-isOrg (Org _) = True
+getResourcesAt :: Environment a -> Pos -> Maybe [Resource]
+getResourcesAt env pos = do
+  cell <- getCellAt env pos
+  getResources cell
+
+insertResourcesAt :: Environment a -> [Resource] -> Pos -> Environment a
+insertResourcesAt (Env m n lim) res p
+  | legalPos p lim = Env (unsafeSet (Org org, res) p m) n lim
+  | otherwise = error "given position is not inbounds"
+  where
+    org = fromJust $ getOrgAt (Env m n lim) p
+
+fillInResources :: Environment a -> [(Pos, [Resource])] -> Environment a
+fillInResources env [] = env
+fillInResources env ((pos, res) : rst) = insertResourcesAt env' res pos
+  where
+    env' = fillInResources env rst
+
+isOrg :: Organism a => Cell a -> Bool
+isOrg (Org _, _) = True
 isOrg _ = False
+
+getOrgAt :: Organism a => Environment a -> Pos -> Maybe a
+getOrgAt env pos = do
+  cell <- getCellAt env pos
+  getOrg cell
 
 getOrgsAt :: Organism a => Environment a -> [Pos] -> [(Pos, a)]
 getOrgsAt _ [] = []
-getOrgsAt env (x : xs) = case getplaceAt env x of
-  Just p ->
-    if isOrg p
-      then (x, fromJust (getOrg p)) : getOrgsAt env xs
+getOrgsAt env (x : xs) = case getCellAt env x of
+  Just c ->
+    if isOrg c
+      then (x, fromJust (getOrg c)) : getOrgsAt env xs
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
-getResourceAt :: Environment a -> Pos -> Maybe Resource
-getResourceAt env pos = do
-  place <- getplaceAt env pos
-  getResource place
-
 isNil :: Organism a => Environment a -> Pos -> Bool
-isNil env p = case getplaceAt env p of
+isNil env p = case getCellAt env p of
   Nothing -> False
-  Just pl -> case pl of
+  Just (life, _) -> case life of
     Nil -> True
     _ -> False
 
-nilGenerator :: Organism a => Pos -> Place a
-nilGenerator _ = Nil
+nilGenerator :: Organism a => Pos -> Cell a
+nilGenerator _ = (Nil, [])
 
 nillify :: Organism a => Environment a -> [Pos] -> Environment a
 nillify = foldl deleteOrganismAt
@@ -129,8 +155,10 @@ getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt (Env m n lim) org p
-  | legalPos p lim = Env (unsafeSet (Org org) p m) n lim
+  | legalPos p lim = Env (unsafeSet (Org org, resources) p m) n lim
   | otherwise = error "given position is not inbounds"
+  where
+    resources = fromJust $ getResourcesAt (Env m n lim) p
 
 getAllOrgs :: Organism a => Environment a -> [a]
 getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
@@ -140,8 +168,10 @@ getOrgsPos env = getOrgsAt env $ getAllPos $ getLim env
 
 deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a
 deleteOrganismAt (Env m n lim) p
-  | legalPos p lim = Env (unsafeSet Nil p m) n lim
+  | legalPos p lim = Env (unsafeSet (Nil, resources) p m) n lim
   | otherwise = error "given position is not inbounds"
+  where
+    resources = fromJust $ getResourcesAt (Env m n lim) p
 
 fillInOrgs :: Organism a => Environment a -> [(Pos, a)] -> Environment a
 fillInOrgs env [] = env
@@ -154,16 +184,16 @@ empty (mx, my) n
   | legalLimits (mx, my) = Env (matrix mx my nilGenerator) n (mx, my)
   | otherwise = error "the given limits must be positive and nonzero"
 
-distributeOrgs :: Organism a => QCGen -> [a] -> Lim -> IO [(Pos, a)]
-distributeOrgs gen orgs lim = distributeOrgs' gen orgs $ getAllPos lim
+distribute :: QCGen -> [a] -> Lim -> IO [(Pos, a)]
+distribute gen orgs lim = distribute' gen orgs $ getAllPos lim
 
-distributeOrgs' :: Organism a => QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
-distributeOrgs' _ [] _ = return []
-distributeOrgs' gen (o : os) list = do
+distribute' :: QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
+distribute' _ [] _ = return []
+distribute' gen (o : os) list = do
   let (g1, g2) = split gen
-  p <- generate $ useSeed g1 $ elements list
+  p <- QC.generate $ useSeed g1 $ QC.elements list
   let l = List.delete p list
-  rest <- distributeOrgs' g2 os l
+  rest <- distribute' g2 os l
   return $ (p, o) : rest
 
 initializeEnvironment ::
@@ -174,16 +204,20 @@ initializeEnvironment ::
   Lim ->
   IO (Environment a)
 initializeEnvironment n gen orgList lim = do
-  posOrgs <- distributeOrgs gen orgList lim
-  return $ fillInOrgs (empty lim n) posOrgs
+  let (g1, g2) = split gen
+  posOrgs <- distribute gen orgList lim
+  let env = fillInOrgs (empty lim n) posOrgs
+  let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.1
+  let resources = generateResources g1 amount 3
+  posRes <- distribute g2 resources lim
+  return $ fillInResources env posRes
 
 selectPosition :: QCGen -> [Pos] -> IO Pos
-selectPosition gen positions = generate $ useSeed gen $ elements positions
+selectPosition gen positions = QC.generate $ useSeed gen $ QC.elements positions
 
 generateRandomPositions :: Organism a => QCGen -> Environment a -> Int -> [Pos]
 generateRandomPositions gen env n = take n $ List.nub $ genRanPos gen env
 
--- Creates infinite list of positions in the environment so be careful
 genRanPos :: Organism a => QCGen -> Environment a -> [Pos]
 genRanPos gen env = (x, y) : genRanPos g2 env
   where
@@ -191,3 +225,13 @@ genRanPos gen env = (x, y) : genRanPos g2 env
     my = getYLim env
     (x, g1) = randomR (1, mx) gen
     (y, g2) = randomR (1, my) g1
+
+-- | Generates a list of a givne length of lists of randomly generated resources
+-- with a random length no greater than a given maximum size.
+generateResources :: QCGen -> Int -> Int -> [[Resource]]
+generateResources _ 0 _ = []
+generateResources gen amount m = take randomSize infinteList : generateResources g3 (amount - 1) m
+  where
+    (g1, g2) = split gen
+    (randomSize, g3) = randomR (1, m) g1
+    infinteList = randoms g2
