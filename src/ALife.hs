@@ -7,7 +7,7 @@ import AST
 import qualified ASTRepresentation as Rep
 import qualified Data.ByteString as BS
 import Data.Numbers.Primes
-import qualified Data.Text as T
+-- import qualified Data.Text as T
 import Environment
 import ExecuteWasm
 import Generators
@@ -136,7 +136,8 @@ run env gen ratio n = do
   case modulo of
     0 ->
       print "Reaper"
-        >> if length orgs > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
+        >> if length orgs
+          > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
           then do
             let killedEnv = killRandom g1 env
             print killedEnv

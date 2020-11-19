@@ -85,6 +85,14 @@ getOrg :: Organism a => Place a -> Maybe a
 getOrg (Org o) = Just o
 getOrg _ = Nothing
 
+getResource :: Place a -> Maybe Resource
+getResource (Res r) = Just r
+getResource _ = Nothing
+
+isResource :: Place a -> Bool
+isResource (Res _) = True
+isResource _ = False
+
 isOrg :: Organism a => Place a -> Bool
 isOrg (Org _) = True
 isOrg _ = False
