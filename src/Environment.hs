@@ -106,14 +106,6 @@ getOrgsAt env (x : xs) = case getplaceAt env x of
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
-getResource :: Place a -> Maybe Resource
-getResource (Res r) = Just r
-getResource _ = Nothing
-
-isResource :: Place a -> Bool
-isResource (Res _) = True
-isResource _ = False
-
 getResourceAt :: Environment a -> Pos -> Maybe Resource
 getResourceAt env pos = do
   place <- getplaceAt env pos
