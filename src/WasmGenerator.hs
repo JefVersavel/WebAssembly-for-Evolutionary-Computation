@@ -2,25 +2,31 @@
 
 module WasmGenerator where
 
-import           AST
-import           Binaryen.Expression (Expression, binary, constFloat64, unary)
-import           Binaryen.Function   (Function, getName)
-import           Binaryen.Index      (Index (Index))
-import           Binaryen.Module     (Module, addFunction, addFunctionExport,
-                                      create)
-import           Binaryen.Op
-import           Binaryen.Type       (float64, none)
-import           BinaryenTranslation
-import           BinaryenUtils
-import           Data.ByteString     as BS (ByteString, writeFile)
-import           Foreign
-import           Generators
-import           Pool
-import           System.Directory
+import AST
+import Binaryen.Expression (Expression, binary, constFloat64, unary)
+import Binaryen.Function (Function, getName)
+import Binaryen.Index (Index (Index))
+import Binaryen.Module
+  ( Module,
+    addFunction,
+    addFunctionExport,
+    create,
+  )
+import Binaryen.Op
+import Binaryen.Type (float64, none)
+import BinaryenTranslation
+import BinaryenUtils
+import Data.ByteString as BS (ByteString, writeFile)
+import Foreign
+import Generators
+import Pool
+import System.Directory
 
+-- | Translates and ASTExpression to a binaryen expression and adds it to the given module.
+-- The given list of doubles is used to initialize the parameters in the ASTExpression.
 generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
-generateExpression m _      (Const d       ) = constFloat64 m d
-generateExpression m params (Param i       ) = constFloat64 m (params !! i)
+generateExpression m _ (Const d) = constFloat64 m d
+generateExpression m params (Param i) = constFloat64 m (params !! i)
 generateExpression m params (BinOp op e1 e2) = do
   ge1 <- generateExpression m params e1
   ge2 <- generateExpression m params e2
@@ -31,66 +37,76 @@ generateExpression m params (UnOp op e) = do
 generateExpression m params (RelOp op e1 e2) = do
   ge1 <- generateExpression m params e1
   ge2 <- generateExpression m params e2
-  be  <- binary m (translateOp op) ge1 ge2
+  be <- binary m (translateOp op) ge1 ge2
   unary m convertUInt32ToFloat64 be
 
+-- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
 generateExpressions :: [Module] -> [Double] -> IO [Expression]
 generateExpressions mods params = do
   exprs <- genASTExpressions 10 5 (length params) 0.5 4
-  sequence [ generateExpression m params e | (e, m) <- zip exprs mods ]
+  sequence [generateExpression m params e | (e, m) <- zip exprs mods]
 
+-- | Translates an ASTExpression to a binaryen function and adds that function the given module.
 generateFunction :: Module -> [Double] -> ASTExpression -> IO Function
 generateFunction m params e = do
-  pool    <- newPool
+  pool <- newPool
   namePtr <- pooledNewByteString0 pool "main"
   typePtr <- pooledNew pool none
-  expr    <- generateExpression m params e
+  expr <- generateExpression m params e
   addFunction m namePtr none float64 typePtr (Index 0) expr
 
+-- | Generates a binaryen module from an ASTExpression by generating a binaryen function wiht that ASTExpression
+-- and adding that function to the default binaryen module,
 createModule :: ASTExpression -> [Double] -> IO Module
 createModule e params = do
-  m            <- create
-  function     <- generateFunction m params e
+  m <- create
+  function <- generateFunction m params e
   functionName <- getName function
-  _            <- addFunctionExport m functionName functionName
+  _ <- addFunctionExport m functionName functionName
   return m
 
+-- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.
 createWasmFiles :: [ASTExpression] -> [Double] -> IO [(ASTExpression, String)]
 createWasmFiles exprs params = do
   let dir = "./src/wasm/"
-  mods <- sequence [ createModule e params | e <- exprs ]
+  mods <- sequence [createModule e params | e <- exprs]
   let fileNames =
-        [ dir ++ "p" ++ show i ++ ".wasm" | i <- [0 .. (length mods - 1)] ]
-  serializedMods <- sequence [ serializeModule m | m <- mods ]
-  oldFiles       <- listDirectory dir
-  let oldFileNames = [ dir ++ f | f <- oldFiles ]
+        [dir ++ "p" ++ show i ++ ".wasm" | i <- [0 .. (length mods - 1)]]
+  serializedMods <- sequence [serializeModule m | m <- mods]
+  oldFiles <- listDirectory dir
+  let oldFileNames = [dir ++ f | f <- oldFiles]
   putStrLn "removing files:"
-  mapM_ putStrLn [ "\t" ++ n | n <- oldFileNames ]
+  mapM_ putStrLn ["\t" ++ n | n <- oldFileNames]
   removeAllFiles oldFileNames
   writeFiles fileNames serializedMods
   putStrLn "Creating files:"
-  mapM_ putStrLn [ "\t" ++ n | n <- fileNames ]
+  mapM_ putStrLn ["\t" ++ n | n <- fileNames]
   return $ zip exprs fileNames
 
-serializeExpressions
-  :: [ASTExpression] -> [Double] -> IO [(ASTExpression, BS.ByteString)]
+-- | Generates tuples of the givne ASTExpressions and its bytestring.
+-- The bytestring is generated by making a module of an ASTExpression and serializing it to wasm.
+serializeExpressions ::
+  [ASTExpression] -> [Double] -> IO [(ASTExpression, BS.ByteString)]
 serializeExpressions exprs params = do
-  mods           <- sequence [ createModule e params | e <- exprs ]
-  serializedMods <- sequence [ serializeModule m | m <- mods ]
+  mods <- sequence [createModule e params | e <- exprs]
+  serializedMods <- sequence [serializeModule m | m <- mods]
   return $ zip exprs serializedMods
 
+-- | Returns the bytestring by generating a module of the given ASTExpression and serializing it to wasm.
 serializeExpression :: ASTExpression -> [Double] -> IO ByteString
 serializeExpression expr params = do
   m <- createModule expr params
   serializeModule m
 
-writeFiles :: [String] -> [BS.ByteString] -> IO ()
-writeFiles []       []       = return ()
+-- | Writes a list of bytestrings to files at the given list of filepaths.
+writeFiles :: [FilePath] -> [BS.ByteString] -> IO ()
+writeFiles [] [] = return ()
 writeFiles (n : ns) (b : bs) = BS.writeFile n b >> writeFiles ns bs
 writeFiles _ _ =
   error
     "the length of the filenames don't match the length of the serialized modules"
 
+-- | Removes all files located at the given list of filepaths.
 removeAllFiles :: [FilePath] -> IO ()
 removeAllFiles = foldr ((>>) . removeFile) (return ())
 
