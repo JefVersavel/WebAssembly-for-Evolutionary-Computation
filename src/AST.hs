@@ -7,50 +7,45 @@ import BinaryenTranslation
 import Data.Serialize
 import GHC.Generics
 
+--- | Internal representation of an expression.
+-- Expressions are modelled as an abstract syntax tree.
+-- These expressions can be converted to wasm modules.
 data ASTExpression
-  = Const Double
-  | Param Int
-  | BinOp BinaryOperation ASTExpression ASTExpression
-  | UnOp UnaryOperation ASTExpression
-  | RelOp RelationalOperation ASTExpression ASTExpression
+  = -- | Leaf of an AST that is just a constant value.
+    Const Double
+  | -- | Leaf of an AST that is a parameter that is configured later.
+    -- The integer represents the index the array of possible parameters.
+    Param Int
+  | -- | Non-leaf node in an AST that represents a binary operation and thus has two sub-expressions.
+    BinOp BinaryOperation ASTExpression ASTExpression
+  | -- | Non-leaf node in an AST that represents a unary operation and thus has one sub-expression.
+    UnOp UnaryOperation ASTExpression
+  | -- | Non-leaf node in an AST that represents a relational operator and thus has two sub-expressions.
+    RelOp RelationalOperation ASTExpression ASTExpression
   deriving (Generic)
 
+-- | ASTExpression is an instance of Serialize so that it can ve serialized to analyse later.
 instance Serialize ASTExpression
 
+-- | Internal representation of a binary operation.
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize BinaryOperation
 
+-- | Internal representation of a unary operation.
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize UnaryOperation
 
+-- | Internal representation of a relational operation.
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize RelationalOperation
 
-getConstVal :: ASTExpression -> Maybe Double
-getConstVal (Const i) = Just i
-getConstVal _ = Nothing
-
-getIndex :: ASTExpression -> Maybe Int
-getIndex (Param i) = Just i
-getIndex _ = Nothing
-
-getFirstASTExpression :: ASTExpression -> Maybe ASTExpression
-getFirstASTExpression (BinOp _ e _) = Just e
-getFirstASTExpression (UnOp _ e) = Just e
-getFirstASTExpression (RelOp _ e _) = Just e
-getFirstASTExpression _ = Nothing
-
-getSecondASTExpression :: ASTExpression -> Maybe ASTExpression
-getSecondASTExpression (BinOp _ _ e) = Just e
-getSecondASTExpression (RelOp _ _ e) = Just e
-getSecondASTExpression _ = Nothing
-
+-- | Returns a string of the root of the AST, usefull for when only a short representation of an AST is needed.
 smallShow :: ASTExpression -> String
 smallShow (Const c) = "Const " ++ show c
 smallShow (Param d) = "Param" ++ show d
@@ -110,9 +105,6 @@ instance OperationTranslation RelationalOperation where
   translateOp Le = leFloat64
   translateOp Ge = geFloat64
 
-instance Show ASTExpression where
-  show e = show' e 0
-
 instance Eq ASTExpression where
   (Const d1) == (Const d2) = d1 == d2
   (Param i1) == (Param i2) = i1 == i2
@@ -123,6 +115,11 @@ instance Eq ASTExpression where
   (UnOp u1 e1) == (UnOp u2 e2) = u1 == u2 && e1 == e2
   _ == _ = False
 
+instance Show ASTExpression where
+  show e = show' e 0
+
+-- | Helper function for the Show instance of ASTExpression.
+-- Uses an extra argument to better use indentation to make the AST more readable.
 show' :: ASTExpression -> Int -> String
 show' _ d | d < 0 = error "The depth cannot be less than 0"
 show' (Const f) _ = " " ++ show f
@@ -146,6 +143,7 @@ show' (RelOp r e1 e2) d =
     ++ show' e2 (d + 1)
     ++ ")"
 
+-- | Returns the maximum depth of an AST.
 getMaxDepth :: ASTExpression -> Int
 getMaxDepth (Const _) = 0
 getMaxDepth (Param _) = 0
@@ -153,6 +151,7 @@ getMaxDepth (UnOp _ e) = 1 + getMaxDepth e
 getMaxDepth (BinOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 
+-- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
 getNrNodes (Const _) = 1
 getNrNodes (Param _) = 1
@@ -160,8 +159,10 @@ getNrNodes (UnOp _ e) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 
+-- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int
 size = getNrNodes
 
+-- | Returns the average size of all the ASTExpressions in a given list.
 averageSize :: [ASTExpression] -> Double
 averageSize exprs = fromIntegral (sum (map size exprs)) / fromIntegral (length exprs)

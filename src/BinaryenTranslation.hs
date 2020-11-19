@@ -1,6 +1,7 @@
 module BinaryenTranslation where
 
-import           Binaryen.Op
+import Binaryen.Op
 
+-- | Class that translates a datatype to a binaryen operation.
 class OperationTranslation a where
-    translateOp :: a -> Op
+  translateOp :: a -> Op
