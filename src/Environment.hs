@@ -108,10 +108,10 @@ getResourcesAt env pos = do
 
 insertResourcesAt :: Environment a -> [Resource] -> Pos -> Environment a
 insertResourcesAt (Env m n lim) res p
-  | legalPos p lim = Env (unsafeSet (Org org, res) p m) n lim
+  | legalPos p lim = Env (unsafeSet (fst cell, res) p m) n lim
   | otherwise = error "given position is not inbounds"
   where
-    org = fromJust $ getOrgAt (Env m n lim) p
+    cell = fromJust $ getCellAt (Env m n lim) p
 
 fillInResources :: Environment a -> [(Pos, [Resource])] -> Environment a
 fillInResources env [] = env
@@ -210,7 +210,8 @@ initializeEnvironment n gen orgList lim = do
   let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.1
   let resources = generateResources g1 amount 3
   posRes <- distribute g2 resources lim
-  return $ fillInResources env posRes
+  let newEnv = fillInResources env posRes
+  return newEnv
 
 selectPosition :: QCGen -> [Pos] -> IO Pos
 selectPosition gen positions = QC.generate $ useSeed gen $ QC.elements positions
