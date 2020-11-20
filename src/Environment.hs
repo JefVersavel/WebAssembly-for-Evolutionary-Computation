@@ -70,42 +70,54 @@ legalLimits (x, y) = x >= 0 && y >= 0
 getAllPos :: Lim -> [Pos]
 getAllPos (mx, my) = [(x, y) | x <- [1 .. mx], y <- [1 .. my]]
 
+-- | Returns the adjacent positions of a given position.
+-- The adjacent positions are are the positions above, below and next to the given position.
 adjacentPos :: Pos -> [Pos]
 adjacentPos (x, y) = [(x -1, y), (x + 1, y), (x, y -1), (x, y + 1)]
 
+-- | Returns the diagonal positions relative to the given position.
 diagonalPos :: Pos -> [Pos]
 diagonalPos (x, y) = [(x -1, y -1), (x + 1, y + 1), (x + 1, y -1), (x -1, y + 1)]
 
+-- | Returns the neighbours of a position in an environment.
+-- This takes into account the environments neighbourhood.
 getNeighbours :: Organism a => Environment a -> Pos -> [Pos]
 getNeighbours (Env _ Moore lim) p =
   [neighbour | neighbour <- adjacentPos p ++ diagonalPos p, legalPos neighbour lim]
 getNeighbours (Env _ VonNeumann lim) p =
   [neighbour | neighbour <- adjacentPos p, legalPos neighbour lim]
 
+-- | Returns the cell for the given position if the given position is legal.
 getCellAt :: Environment a -> Pos -> Maybe (Cell a)
 getCellAt (Env m _ maxPos) p
   | legalPos p maxPos = Just $ uncurry unsafeGet p m
   | otherwise = Nothing
 
+-- | Returns The organism at the given cell if it contains an organism.
+-- It returns Nothing if there was no organism.
 getOrg :: Organism a => Cell a -> Maybe a
 getOrg (Org o, _) = Just o
 getOrg _ = Nothing
 
+-- | Returns the resources in a given cell.
 getResources :: Cell a -> Maybe [Resource]
 getResources (_, r) = Just r
 getResources _ = Nothing
 
+-- | Returns True if the given cell has a non-zero amount of resources.
 containsResources :: Cell a -> Bool
 containsResources (_, r)
   | null r = False
   | otherwise = True
 containsResources _ = False
 
+-- | Returns the resources at a given position.
 getResourcesAt :: Environment a -> Pos -> Maybe [Resource]
 getResourcesAt env pos = do
   cell <- getCellAt env pos
   getResources cell
 
+-- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Environment a -> [Resource] -> Pos -> Environment a
 insertResourcesAt (Env m n lim) res p
   | legalPos p lim = Env (unsafeSet (fst cell, res) p m) n lim
@@ -113,21 +125,26 @@ insertResourcesAt (Env m n lim) res p
   where
     cell = fromJust $ getCellAt (Env m n lim) p
 
+-- | Fills in the given list of tuples with positions and resources into the environmnet.
 fillInResources :: Environment a -> [(Pos, [Resource])] -> Environment a
 fillInResources env [] = env
 fillInResources env ((pos, res) : rst) = insertResourcesAt env' res pos
   where
     env' = fillInResources env rst
 
+-- | Returns True if the given cell contains an organism.
 isOrg :: Organism a => Cell a -> Bool
 isOrg (Org _, _) = True
 isOrg _ = False
 
+-- | Returns the organism at the given position in the environment if it contains one, otherwise return Noting.
 getOrgAt :: Organism a => Environment a -> Pos -> Maybe a
 getOrgAt env pos = do
   cell <- getCellAt env pos
   getOrg cell
 
+-- | Returns a list of tuples with positions with is corresponding organism for the given list of positions
+-- in the given environment.
 getOrgsAt :: Organism a => Environment a -> [Pos] -> [(Pos, a)]
 getOrgsAt _ [] = []
 getOrgsAt env (x : xs) = case getCellAt env x of
@@ -137,6 +154,7 @@ getOrgsAt env (x : xs) = case getCellAt env x of
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
+-- | Returns True if there is no Organism at the given position in environment.
 isNil :: Organism a => Environment a -> Pos -> Bool
 isNil env p = case getCellAt env p of
   Nothing -> False
@@ -144,15 +162,20 @@ isNil env p = case getCellAt env p of
     Nil -> True
     _ -> False
 
+-- | Returns a cell with without organism and resources for the given position.
+-- This is used to initiate an empty environment.
 nilGenerator :: Organism a => Pos -> Cell a
 nilGenerator _ = (Nil, [])
 
+-- | Deletes the organisms at the fiven list of positions.
 nillify :: Organism a => Environment a -> [Pos] -> Environment a
 nillify = foldl deleteOrganismAt
 
+-- | Returns the neighbours of the given position in the environment that do not contaim an organism.
 getNilNeighbours :: Organism a => Environment a -> Pos -> [Pos]
 getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 
+-- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt (Env m n lim) org p
   | legalPos p lim = Env (unsafeSet (Org org, resources) p m) n lim
@@ -160,12 +183,15 @@ insertOrganismAt (Env m n lim) org p
   where
     resources = fromJust $ getResourcesAt (Env m n lim) p
 
+-- | Returns a list of all the organims in the environment.
 getAllOrgs :: Organism a => Environment a -> [a]
 getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
 
+-- | Returns a list of tuples with all all the organisms in the environment with its accompanying position.
 getOrgsPos :: Organism a => Environment a -> [(Pos, a)]
 getOrgsPos env = getOrgsAt env $ getAllPos $ getLim env
 
+-- | Deletes organism at the given position.
 deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a
 deleteOrganismAt (Env m n lim) p
   | legalPos p lim = Env (unsafeSet (Nil, resources) p m) n lim
@@ -173,20 +199,27 @@ deleteOrganismAt (Env m n lim) p
   where
     resources = fromJust $ getResourcesAt (Env m n lim) p
 
+-- | Takes a list of tuples with positions and organisms
+-- and insterts the organisms at their accompanying positions.
 fillInOrgs :: Organism a => Environment a -> [(Pos, a)] -> Environment a
 fillInOrgs env [] = env
 fillInOrgs env ((pos, org) : rst) = insertOrganismAt env' org pos
   where
     env' = fillInOrgs env rst
 
+-- | Returns an empty environment, with Nill and no resources at every environment,
+-- with the given limits and neighbourhood.
 empty :: Organism a => Lim -> Neighbourhood -> Environment a
 empty (mx, my) n
   | legalLimits (mx, my) = Env (matrix mx my nilGenerator) n (mx, my)
   | otherwise = error "the given limits must be positive and nonzero"
 
+-- | Distributes the given list of items, could be organisms or resources,
+-- among positions within the given limits.
 distribute :: QCGen -> [a] -> Lim -> IO [(Pos, a)]
 distribute gen orgs lim = distribute' gen orgs $ getAllPos lim
 
+-- | Distributes the given list of items along the given list of items.
 distribute' :: QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
 distribute' _ [] _ = return []
 distribute' gen (o : os) list = do
@@ -196,6 +229,8 @@ distribute' gen (o : os) list = do
   rest <- distribute' g2 os l
   return $ (p, o) : rest
 
+-- | Initializes a new environment with the given limits, neighbourhood and organisms.
+-- Random resources are generated and added to the environment at random positions.
 initializeEnvironment ::
   Organism a =>
   Neighbourhood ->
@@ -213,12 +248,15 @@ initializeEnvironment n gen orgList lim = do
   let newEnv = fillInResources env posRes
   return newEnv
 
+-- | Generate a random position from a list of positions.
 selectPosition :: QCGen -> [Pos] -> IO Pos
 selectPosition gen positions = QC.generate $ useSeed gen $ QC.elements positions
 
+-- | Generate a list of unique random positions of a given length within the limits of the environment.
 generateRandomPositions :: Organism a => QCGen -> Environment a -> Int -> [Pos]
 generateRandomPositions gen env n = take n $ List.nub $ genRanPos gen env
 
+-- | Generates an infinite list of random positions of the environment.
 genRanPos :: Organism a => QCGen -> Environment a -> [Pos]
 genRanPos gen env = (x, y) : genRanPos g2 env
   where
