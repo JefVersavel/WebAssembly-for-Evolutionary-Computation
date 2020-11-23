@@ -23,7 +23,7 @@ data ASTExpression
     UnOp UnaryOperation ASTExpression
   | -- | Non-leaf node in an AST that represents a relational operator and thus has two sub-expressions.
     RelOp RelationalOperation ASTExpression ASTExpression
-  deriving (Generic)
+  deriving (Generic, Ord)
 
 -- | ASTExpression is an instance of Serialize so that it can ve serialized to analyse later.
 instance Serialize ASTExpression
@@ -32,7 +32,7 @@ instance ToJSON ASTExpression
 
 -- | Internal representation of a binary operation.
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum, Eq, Bounded, Generic)
+  deriving (Enum, Eq, Ord, Bounded, Generic)
 
 instance Serialize BinaryOperation
 
@@ -40,7 +40,7 @@ instance ToJSON BinaryOperation
 
 -- | Internal representation of a unary operation.
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum, Eq, Bounded, Generic)
+  deriving (Enum, Eq, Ord, Bounded, Generic)
 
 instance Serialize UnaryOperation
 
@@ -48,7 +48,7 @@ instance ToJSON UnaryOperation
 
 -- | Internal representation of a relational operation.
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum, Eq, Bounded, Generic)
+  deriving (Enum, Eq, Ord, Bounded, Generic)
 
 instance Serialize RelationalOperation
 

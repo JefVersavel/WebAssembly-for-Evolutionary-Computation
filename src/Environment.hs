@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
 module Environment where
 
+import Data.Aeson
 import qualified Data.List as List
 import Data.Matrix
 import Data.Maybe
+import GHC.Generics
 import Organism
 import Seeding
 import System.Random
@@ -19,7 +23,10 @@ type Lim = Pos
 
 -- | Reprents a lifeform in the environment,
 -- it can either be Nil which means that there is no life form in the cell or it can be an Organism.
-data Life a = Organism a => Nil | Org a
+data Life a = Nil | Org a
+  deriving (Generic)
+
+instance ToJSON a => ToJSON (Life a)
 
 -- | Represents a cell in the environemnt with its lifeform and a list of resources that can be found in that cell.
 type Cell a = (Life a, [Resource])
@@ -29,12 +36,16 @@ instance (Show a, Organism a) => Show (Life a) where
   show (Org org) = genotype org
 
 -- | Represents the environment with cells and the neighbourhood and limits of the environment.
-data Environment a = Organism a =>
-  Env
+data Environment a = Env
   { grid :: Matrix (Cell a),
     neighbourhood :: Neighbourhood,
     limits :: Lim
   }
+  deriving (Generic)
+
+instance ToJSON a => ToJSON (Environment a)
+
+instance ToJSON a => ToJSON (Matrix (Cell a))
 
 instance (Show a, Organism a) => Show (Environment a) where
   show env = showCells $ toLists $ grid env
@@ -54,7 +65,9 @@ showRow (c : cs) = show c ++ ", " ++ showRow cs
 -- https://en.wikipedia.org/wiki/Moore_neighborhood
 -- https://en.wikipedia.org/wiki/Von_Neumann_neighborhood
 data Neighbourhood = Moore | VonNeumann
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON Neighbourhood
 
 -- functions to work with the limits of hte environmnet
 

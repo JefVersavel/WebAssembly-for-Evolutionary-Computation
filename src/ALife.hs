@@ -6,10 +6,13 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Control.Monad.State
 import Data.Aeson
 import qualified Data.ByteString as BS
+import qualified Data.Map as M
 import Data.Numbers.Primes
 import qualified Data.Text as T
+import Debug.Trace
 import Environment
 import ExecuteWasm
 import GHC.Generics
@@ -24,15 +27,11 @@ import WasmGenerator
 -- | Data type that represents a creature in the environment.
 data Creature = Creature
   { expression :: ASTExpression, -- The expression that represents the program of the creature.
-    bytes :: BS.ByteString, -- The bytestring that is serialized from the expression.
     register :: Double -- Stores the value of the register that contains the state of the creature.
   }
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Ord)
 
-data SmallCreature = SmallCreature ASTExpression Double
-  deriving (Eq, Generic)
-
-instance ToJSON SmallCreature
+instance ToJSON Creature
 
 instance Organism Creature where
   genotype creature =
@@ -46,13 +45,20 @@ instance Organism Creature where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
 
 instance Show Creature where
-  show (Creature e _ r) =
+  show (Creature e r) =
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
+type Bytes = M.Map Creature BS.ByteString
+
+data Run = Run {environments :: [Environment Creature]}
+  deriving (Generic)
+
+instance ToJSON Run
+
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e b _) = Creature e b
+changeRegister (Creature e _) = Creature e
 
 -- | Returns a random register for the creature in the environment at the given position.
 -- The random register is uniformly selected from the register of the creature and the resources,
@@ -82,8 +88,7 @@ generateInitPop gen start lim = do
   let (g1, g2) = split gen
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
-  serialized <- sequence [serializeExpression e [st] | (e, st) <- zip ex starts]
-  return [Creature e ser st | ((e, ser), st) <- zip (zip ex serialized) starts]
+  return [Creature e st | (e, st) <- zip ex starts]
 
 -- | Generates a list of random values for the registers of the creatures with a given bound and size of that list.
 generateStart :: QCGen -> Size -> Double -> [Double]
@@ -100,7 +105,7 @@ initEnvironment gen n l s = do
 -- | Mutates the the creatures in the environment.
 -- It does not mutate all the creatures. I randomly chooses a number of positions from the environment.
 -- When there is a creature at these positions that creature is mutated. It is kind of like a cosmic ray.
-mutateEnvironment :: QCGen -> Environment Creature -> Ratio -> IO (Environment Creature)
+mutateEnvironment :: QCGen -> Environment Creature -> Ratio -> StateT Bytes IO (Environment Creature)
 mutateEnvironment gen env ratio = do
   let (g1, g2) = split gen
   let amount = round (ratio * fromIntegral (Environment.getSize env) :: Double)
@@ -112,25 +117,35 @@ mutateEnvironment gen env ratio = do
   return $ fillInOrgs env (zip pos mutated)
 
 -- | Performs sun-tree mutation of the given list of creatures.
-mutateCreatures :: QCGen -> [Creature] -> IO [Creature]
-mutateCreatures _ [] = return []
+mutateCreatures :: QCGen -> [Creature] -> StateT Bytes IO [Creature]
+mutateCreatures _ [] = liftIO $ return []
 mutateCreatures gen (o : os) = do
   let (g1, g2) = split gen
   let r = register o
-  e <- subTreeMutation g1 (expression o) 1
+  e <- liftIO $ subTreeMutation g1 (expression o) 1
   rest <- mutateCreatures g2 os
-  serialized <- serializeExpression e [r]
-  return $ Creature e serialized r : rest
+  serialized <- liftIO $ serializeExpression e [r]
+  bytes <- get
+  put $ M.insert o serialized bytes
+  return $ Creature e r : rest
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
-executeCreature :: Creature -> IO Creature
-executeCreature (Creature e b _) = do
-  outcome <- executeModule b
-  return $ Creature e b outcome
+executeCreature :: Creature -> BS.ByteString -> IO Creature
+executeCreature creature bstring = do
+  outcome <- executeModule bstring
+  return $ Creature (expression creature) outcome
 
 -- | Executes a list of creaturs.
-executeCreatures :: [Creature] -> IO [Creature]
-executeCreatures orgs = sequence [executeCreature org | org <- orgs]
+executeCreatures :: [Creature] -> StateT Bytes IO [Creature]
+executeCreatures orgs = do
+  bytes <- get
+  liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
+
+extractByte :: Creature -> Bytes -> BS.ByteString
+extractByte creature bytes =
+  case M.lookup creature bytes of
+    Nothing -> error "Found no matching bytestring for given creature"
+    Just bstring -> bstring
 
 -- | Returms True if the given creature is able to reproduce.
 reproducable :: Creature -> Bool
@@ -194,10 +209,8 @@ switchRegister gen env pos =
 -- Secondly the creatures in the environment are executed and their register is updated.
 -- Thirdly the environment is mutated.
 -- Lastly the reproducable creatures are reproduced in the environment.
-run :: Environment Creature -> QCGen -> Ratio -> Int -> IO [Environment Creature]
+run :: Environment Creature -> QCGen -> Ratio -> Int -> StateT Bytes IO [Environment Creature]
 run env _ _ 0 = do
-  print "End"
-  print env
   return [env]
 run env gen ratio n = do
   let (g1, g2) = split gen
@@ -208,35 +221,27 @@ run env gen ratio n = do
   let nxt = n -1
   case modulo of
     0 ->
-      print "Reaper"
-        >> if length orgs
+      trace "The Reaper" $
+        if length orgs
           > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
           then do
             let killedEnv = killRandom g1 env
-            print killedEnv
             killedRun <- run killedEnv g2 ratio nxt
             return $ killedEnv : killedRun
           else do
-            print env
             rest <- run env g2 ratio nxt
             return $ env : rest
     3 -> do
-      print "Execution"
       executed <- executeCreatures orgs
       let newEnv = fillInOrgs env $ zip positions executed
-      print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
     2 -> do
-      print "Mutation"
       newEnv <- mutateEnvironment g1 env ratio
-      print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
     _ -> do
-      print "reproduction"
-      newEnv <- reproduce g1 env
-      print newEnv
+      newEnv <- liftIO $ reproduce g1 env
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
 
@@ -248,7 +253,7 @@ mainCreature seed mutationRatio start iterations = do
   env <- initEnvironment g1 Moore lim start
   print "Init"
   print env
-  run env g2 mutationRatio (iterations * 4)
+  runStateT (run env g2 mutationRatio (iterations * 4)) M.empty
   return ()
 
 testCreature = mainCreature 10 0.5 0.5 10
