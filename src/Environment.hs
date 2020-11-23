@@ -29,10 +29,26 @@ instance (Show a, Organism a) => Show (Life a) where
   show (Org org) = genotype org
 
 -- | Represents the environment with cells and the neighbourhood and limits of the environment.
-data Environment a = Organism a => Env (Matrix (Cell a)) Neighbourhood Lim
+data Environment a = Organism a =>
+  Env
+  { grid :: Matrix (Cell a),
+    neighbourhood :: Neighbourhood,
+    limits :: Lim
+  }
 
-instance Show a => Show (Environment a) where
-  show (Env m _ _) = show m
+instance (Show a, Organism a) => Show (Environment a) where
+  show env = showCells $ toLists $ grid env
+
+-- | Returns a textual representation of a list of rows from the grid.
+showCells :: Organism a => [[Cell a]] -> String
+showCells [] = ""
+showCells (row : rest) = showRow row ++ "\n" ++ showCells rest
+
+-- | Returns a textual representation of a row on the grid.
+showRow :: Organism a => [Cell a] -> String
+showRow [] = ""
+showRow [c] = show c
+showRow (c : cs) = show c ++ ", " ++ showRow cs
 
 -- | The neighbourhood of an environment which affects wich cells are neighbours of eachother.
 -- https://en.wikipedia.org/wiki/Moore_neighborhood

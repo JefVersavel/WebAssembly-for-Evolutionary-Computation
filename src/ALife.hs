@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -5,11 +6,13 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Data.Aeson
 import qualified Data.ByteString as BS
 import Data.Numbers.Primes
--- import qualified Data.Text as T
+import qualified Data.Text as T
 import Environment
 import ExecuteWasm
+import GHC.Generics
 import Generators
 import GeneticOperations
 import Organism
@@ -24,7 +27,29 @@ data Creature = Creature
     bytes :: BS.ByteString, -- The bytestring that is serialized from the expression.
     register :: Double -- Stores the value of the register that contains the state of the creature.
   }
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+data SmallCreature = SmallCreature ASTExpression Double
+  deriving (Eq, Generic)
+
+instance ToJSON SmallCreature
+
+instance Organism Creature where
+  genotype creature =
+    show $
+      firstOp
+        ++ "_"
+        ++ show (size $ expression creature)
+        ++ "_"
+        ++ show (getMaxDepth $ expression creature)
+    where
+      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
+
+instance Show Creature where
+  show (Creature e _ r) =
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+
+type GenotypePop = [(String, Int)]
 
 changeRegister :: Creature -> Double -> Creature
 changeRegister (Creature e b _) = Creature e b
@@ -48,23 +73,6 @@ getRandomRegister gen env pos crea =
   where
     org = getOrgAt env pos
     resources = getResourcesAt env pos
-
-instance Organism Creature where
-  genotype creature = show $ reproducable creature
-
--- firstOp
---   ++ "_"
---   ++ show (size $ expression mvp)
---   ++ "_"
---   ++ show (getMaxDepth $ expression mvp)
--- where
---   firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
-
-instance Show Creature where
-  show (Creature e _ r) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
-
-type GenotypePop = [(String, Int)]
 
 -- | Generates an initial population of creatures with and a bound for the initial value of the registers of the creatures and the limits of the environment.
 -- The amount of creatures that need to be generated is equal to at least a tenth of the total cells in the environment.
