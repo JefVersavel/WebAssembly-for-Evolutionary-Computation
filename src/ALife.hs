@@ -24,9 +24,30 @@ data Creature = Creature
     bytes :: BS.ByteString, -- The bytestring that is serialized from the expression.
     register :: Double -- Stores the value of the register that contains the state of the creature.
   }
+  deriving (Eq)
 
 changeRegister :: Creature -> Double -> Creature
 changeRegister (Creature e b _) = Creature e b
+
+-- | Returns a random register for the creature in the environment at the given position.
+-- The random register is uniformly selected from the register of the creature and the resources,
+-- if there are any, at the position.
+getRandomRegister :: QCGen -> Environment Creature -> Pos -> Creature -> Double
+getRandomRegister gen env pos crea =
+  case org of
+    Nothing -> error "whoops you tried to acces a register at a position where there is no creature"
+    Just creature ->
+      if creature /= crea
+        then error "mismatched given creature and creature at given position."
+        else case resources of
+          Nothing -> register creature
+          Just resList ->
+            let totalList = register creature : resList
+                randomNb = fst $ randomR (0, length totalList - 1) gen
+             in totalList !! randomNb
+  where
+    org = getOrgAt env pos
+    resources = getResourcesAt env pos
 
 instance Organism Creature where
   genotype creature = show $ reproducable creature
