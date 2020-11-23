@@ -60,19 +60,21 @@ data Neighbourhood = Moore | VonNeumann
 
 -- | Returns the limits of the environment
 getLim :: Environment a -> Lim
-getLim (Env _ _ l) = l
+getLim = limits
 
 -- | Returns the limit of the 1st dimension.
 getXLim :: Environment a -> Int
-getXLim (Env _ _ (mx, _)) = mx
+getXLim env = fst $ limits env
 
 -- | Returns the limit of the 2nd dimentsion.
 getYLim :: Environment a -> Int
-getYLim (Env _ _ (_, my)) = my
+getYLim env = snd $ limits env
 
 -- | Returns the amount of cells in the environment.
 getSize :: Environment a -> Int
-getSize (Env _ _ (mx, my)) = mx * my
+getSize env = x * y
+  where
+    (x, y) = limits env
 
 -- | Returns True if a given position is within the limits of the environment.
 legalPos :: Pos -> Lim -> Bool
@@ -105,8 +107,8 @@ getNeighbours (Env _ VonNeumann lim) p =
 
 -- | Returns the cell for the given position if the given position is legal.
 getCellAt :: Environment a -> Pos -> Maybe (Cell a)
-getCellAt (Env m _ maxPos) p
-  | legalPos p maxPos = Just $ uncurry unsafeGet p m
+getCellAt env p
+  | legalPos p $ limits env = Just $ uncurry unsafeGet p $ grid env
   | otherwise = Nothing
 
 -- | Returns The organism at the given cell if it contains an organism.
@@ -123,7 +125,7 @@ getResources _ = Nothing
 -- | Returns True if the given cell has a non-zero amount of resources.
 containsResources :: Cell a -> Bool
 containsResources (_, r)
-  | null r = False
+  | List.null r = False
   | otherwise = True
 containsResources _ = False
 
@@ -134,15 +136,18 @@ getResourcesAt env pos = do
   getResources cell
 
 -- | Inserts the given resources the given position in the environmnet.
-insertResourcesAt :: Environment a -> [Resource] -> Pos -> Environment a
-insertResourcesAt (Env m n lim) res p
-  | legalPos p lim = Env (unsafeSet (fst cell, res) p m) n lim
+insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
+insertResourcesAt env res p
+  | legalPos p lim = Env (unsafeSet (fst cell, res) p grd) hood lim
   | otherwise = error "given position is not inbounds"
   where
-    cell = fromJust $ getCellAt (Env m n lim) p
+    cell = fromJust $ getCellAt env p
+    grd = grid env
+    lim = limits env
+    hood = neighbourhood env
 
 -- | Fills in the given list of tuples with positions and resources into the environmnet.
-fillInResources :: Environment a -> [(Pos, [Resource])] -> Environment a
+fillInResources :: Organism a => Environment a -> [(Pos, [Resource])] -> Environment a
 fillInResources env [] = env
 fillInResources env ((pos, res) : rst) = insertResourcesAt env' res pos
   where
@@ -193,11 +198,14 @@ getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 
 -- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
-insertOrganismAt (Env m n lim) org p
-  | legalPos p lim = Env (unsafeSet (Org org, resources) p m) n lim
+insertOrganismAt env org p
+  | legalPos p lim = Env (unsafeSet (Org org, resources) p grd) hood lim
   | otherwise = error "given position is not inbounds"
   where
-    resources = fromJust $ getResourcesAt (Env m n lim) p
+    resources = fromJust $ getResourcesAt env p
+    grd = grid env
+    lim = limits env
+    hood = neighbourhood env
 
 -- | Returns a list of all the organims in the environment.
 getAllOrgs :: Organism a => Environment a -> [a]
@@ -209,11 +217,14 @@ getOrgsPos env = getOrgsAt env $ getAllPos $ getLim env
 
 -- | Deletes organism at the given position.
 deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a
-deleteOrganismAt (Env m n lim) p
-  | legalPos p lim = Env (unsafeSet (Nil, resources) p m) n lim
+deleteOrganismAt env p
+  | legalPos p lim = Env (unsafeSet (Nil, resources) p grd) hood lim
   | otherwise = error "given position is not inbounds"
   where
-    resources = fromJust $ getResourcesAt (Env m n lim) p
+    resources = fromJust $ getResourcesAt env p
+    grd = grid env
+    lim = limits env
+    hood = neighbourhood env
 
 -- | Takes a list of tuples with positions and organisms
 -- and insterts the organisms at their accompanying positions.

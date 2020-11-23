@@ -5,7 +5,7 @@ import GraphicalAnalysis
 import System.Directory
 
 -- | Class representing organisms with a genotype that uniquely identifies a unique creature.
-class Show a => Organism a where
+class (Show a, Eq a) => Organism a where
   genotype :: a -> String
 
 -- | The path at which the generated charts are located.
