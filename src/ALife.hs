@@ -25,6 +25,9 @@ data Creature = Creature
     register :: Double -- Stores the value of the register that contains the state of the creature.
   }
 
+changeRegister :: Creature -> Double -> Creature
+changeRegister (Creature e b _) = Creature e b
+
 instance Organism Creature where
   genotype creature = show $ reproducable creature
 
@@ -137,6 +140,25 @@ reproduceList gen env (o : os) = do
   if reproducable creature
     then insertOrganismAt rest creature <$> childPos
     else return rest
+
+-- | randomly switches the register of the creature at .e given position
+-- with one of the resources at that position or its own register.
+-- When there is no creature or there are no resources at the position the the original environment is returned.
+switchRegister :: QCGen -> Environment Creature -> Pos -> Environment Creature
+switchRegister gen env pos =
+  case org of
+    Nothing -> env
+    Just creature ->
+      case resources of
+        Nothing -> env
+        Just resList ->
+          let totalList = register creature : resList
+              randomNb = fst $ randomR (0, length totalList - 1) gen
+              newCreature = changeRegister creature $ totalList !! randomNb
+           in insertOrganismAt env newCreature pos
+  where
+    org = getOrgAt env pos
+    resources = getResourcesAt env pos
 
 -- | Performs a run.
 -- First the Reaper is invoked and randomly kills creature if the environment is more than 80% full.
