@@ -114,6 +114,11 @@ mutateEnvironment gen env ratio = do
   let orgs = map snd creatures
   let pos = map fst creatures
   mutated <- mutateCreatures g2 orgs
+  bytes <- get
+  let afterDeletion = deleteOrganisms bytes orgs
+  let afterInsertion = liftIO $ insertBytes mutated afterDeletion
+  afterExtraction <- afterInsertion
+  put afterExtraction
   return $ fillInOrgs env (zip pos mutated)
 
 -- | Performs sun-tree mutation of the given list of creatures.
@@ -126,8 +131,22 @@ mutateCreatures gen (o : os) = do
   rest <- mutateCreatures g2 os
   serialized <- liftIO $ serializeExpression e [r]
   bytes <- get
-  put $ M.insert o serialized bytes
+  let newBytes = M.delete o bytes
+  put $ M.insert o serialized newBytes
   return $ Creature e r : rest
+
+-- | Serializes the creatures in the given environment into a Map.
+serializeEnvironment :: Environment Creature -> IO Bytes
+serializeEnvironment env = insertBytes creatures M.empty
+  where
+    creatures = getAllOrgs env
+
+-- | Serializes the given list of creatures and puts the resul into the given map.
+insertBytes :: [Creature] -> Bytes -> IO Bytes
+insertBytes [] bytes = return bytes
+insertBytes (c : cs) bytes = do
+  serialized <- serializeExpression (expression c) [register c]
+  insertBytes cs $ M.insert c serialized bytes
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> BS.ByteString -> IO Creature
@@ -139,7 +158,6 @@ executeCreature creature bstring = do
 executeCreatures :: [Creature] -> StateT Bytes IO [Creature]
 executeCreatures orgs = do
   bytes <- get
-  liftIO $ print "executing is maybe happening"
   liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
 
 extractByte :: Creature -> Bytes -> BS.ByteString
@@ -147,10 +165,6 @@ extractByte creature bytes =
   case M.lookup creature bytes of
     Nothing -> error "Found no matching bytestring for given creature"
     Just bstring -> bstring
-
--- | Returms True if the given creature is able to reproduce.
-reproducable :: Creature -> Bool
-reproducable org = isPrime (round (register org) :: Int)
 
 -- | Randomly kills creatures to control the population.
 -- This is achieved by first randomly selecting the half of the position in the environment.
@@ -167,6 +181,10 @@ killRandom gen env = do
 
 deleteOrganisms :: Bytes -> [Creature] -> Bytes
 deleteOrganisms = foldl (flip M.delete)
+
+-- | Returms True if the given creature is able to reproduce.
+reproducable :: Creature -> Bool
+reproducable org = True -- isPrime (round (register org) :: Int)
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
 reproduce :: QCGen -> Environment Creature -> IO (Environment Creature)
@@ -223,6 +241,7 @@ run env _ _ 0 = do
   liftIO $ print env
   return [env]
 run env gen ratio n = do
+  liftIO $ print n
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
@@ -236,6 +255,8 @@ run env gen ratio n = do
         then do
           liftIO $ print "The Reaper"
           killedEnv <- killRandom g1 env
+          bytes <- liftIO $ serializeEnvironment killedEnv
+          put bytes
           liftIO $ print killedEnv
           killedRun <- run killedEnv g2 ratio nxt
           return $ killedEnv : killedRun
@@ -247,7 +268,10 @@ run env gen ratio n = do
     3 -> do
       liftIO $ print "Execution"
       executed <- executeCreatures orgs
+      liftIO $ print executed
       let newEnv = fillInOrgs env $ zip positions executed
+      bytes <- liftIO $ serializeEnvironment newEnv
+      put bytes
       liftIO $ print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
@@ -272,7 +296,8 @@ mainCreature seed mutationRatio start iterations = do
   env <- initEnvironment g1 Moore lim start
   print "Init"
   print env
-  runStateT (run env g2 mutationRatio (iterations * 4)) M.empty
+  initMap <- serializeEnvironment env
+  runStateT (run env g2 mutationRatio (iterations * 4)) initMap
   print "the end"
   return ()
 
