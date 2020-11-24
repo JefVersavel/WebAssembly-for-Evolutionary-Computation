@@ -188,6 +188,17 @@ getOrgsAt env (x : xs) = case getCellAt env x of
       else getOrgsAt env xs
   Nothing -> getOrgsAt env xs
 
+-- | Returns a list of organisms for the given list of positions
+-- in the given environment.
+getOrganisms :: Organism a => Environment a -> [Pos] -> [a]
+getOrganisms _ [] = []
+getOrganisms env (x : xs) = case getCellAt env x of
+  Just c ->
+    if isOrg c
+      then fromJust (getOrg c) : getOrganisms env xs
+      else getOrganisms env xs
+  Nothing -> getOrganisms env xs
+
 -- | Returns True if there is no Organism at the given position in environment.
 isNil :: Organism a => Environment a -> Pos -> Bool
 isNil env p = case getCellAt env p of

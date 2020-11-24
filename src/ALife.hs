@@ -139,6 +139,7 @@ executeCreature creature bstring = do
 executeCreatures :: [Creature] -> StateT Bytes IO [Creature]
 executeCreatures orgs = do
   bytes <- get
+  liftIO $ print "executing is maybe happening"
   liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
 
 extractByte :: Creature -> Bytes -> BS.ByteString
@@ -154,11 +155,18 @@ reproducable org = isPrime (round (register org) :: Int)
 -- | Randomly kills creatures to control the population.
 -- This is achieved by first randomly selecting the half of the position in the environment.
 -- When there is a creature at the position the creatures id killed.
-killRandom :: QCGen -> Environment Creature -> Environment Creature
-killRandom gen env = nillify env positions
+killRandom :: QCGen -> Environment Creature -> StateT Bytes IO (Environment Creature)
+killRandom gen env = do
+  bytes <- get
+  put $ deleteOrganisms bytes orgs
+  return $ nillify env positions
   where
     positions =
       generateRandomPositions gen env (round (0.5 * fromIntegral (Environment.getSize env) :: Double))
+    orgs = getOrganisms env positions
+
+deleteOrganisms :: Bytes -> [Creature] -> Bytes
+deleteOrganisms = foldl (flip M.delete)
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
 reproduce :: QCGen -> Environment Creature -> IO (Environment Creature)
@@ -211,6 +219,8 @@ switchRegister gen env pos =
 -- Lastly the reproducable creatures are reproduced in the environment.
 run :: Environment Creature -> QCGen -> Ratio -> Int -> StateT Bytes IO [Environment Creature]
 run env _ _ 0 = do
+  liftIO $ print "The end"
+  liftIO $ print env
   return [env]
 run env gen ratio n = do
   let (g1, g2) = split gen
@@ -221,27 +231,36 @@ run env gen ratio n = do
   let nxt = n -1
   case modulo of
     0 ->
-      trace "The Reaper" $
-        if length orgs
-          > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
-          then do
-            let killedEnv = killRandom g1 env
-            killedRun <- run killedEnv g2 ratio nxt
-            return $ killedEnv : killedRun
-          else do
-            rest <- run env g2 ratio nxt
-            return $ env : rest
+      if length orgs
+        > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
+        then do
+          liftIO $ print "The Reaper"
+          killedEnv <- killRandom g1 env
+          liftIO $ print killedEnv
+          killedRun <- run killedEnv g2 ratio nxt
+          return $ killedEnv : killedRun
+        else do
+          liftIO $ print "The Reaper"
+          liftIO $ print env
+          rest <- run env g2 ratio nxt
+          return $ env : rest
     3 -> do
+      liftIO $ print "Execution"
       executed <- executeCreatures orgs
       let newEnv = fillInOrgs env $ zip positions executed
+      liftIO $ print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
     2 -> do
+      liftIO $ print "Mutation"
       newEnv <- mutateEnvironment g1 env ratio
+      liftIO $ print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
     _ -> do
+      liftIO $ print "Reproduction"
       newEnv <- liftIO $ reproduce g1 env
+      liftIO $ print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
 
@@ -254,6 +273,7 @@ mainCreature seed mutationRatio start iterations = do
   print "Init"
   print env
   runStateT (run env g2 mutationRatio (iterations * 4)) M.empty
+  print "the end"
   return ()
 
 testCreature = mainCreature 10 0.5 0.5 10
