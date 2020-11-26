@@ -18,5 +18,6 @@ totalResources = 1
 neighbourDistribution :: Bool
 neighbourDistribution = True
 
+-- | Randomly picks one of the positions from a list.
 distributeResource :: QCGen -> [Pos] -> IO Pos
 distributeResource gen positions = generate $ useSeed gen $ elements positions

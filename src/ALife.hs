@@ -134,7 +134,7 @@ executeCreatures orgs = sequence [executeCreature org | org <- orgs]
 
 -- | Returms True if the given creature is able to reproduce.
 reproducable :: Creature -> Bool
-reproducable org = isPrime (round (register org) :: Int)
+reproducable org = True -- isPrime (round (register org) :: Int)
 
 -- | Randomly kills creatures to control the population.
 -- This is achieved by first randomly selecting the half of the position in the environment.
@@ -200,6 +200,7 @@ run env _ _ 0 = do
   print env
   return [env]
 run env gen ratio n = do
+  print n
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
@@ -251,4 +252,4 @@ mainCreature seed mutationRatio start iterations = do
   run env g2 mutationRatio (iterations * 4)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 50
