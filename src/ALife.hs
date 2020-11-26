@@ -55,6 +55,9 @@ type Bytes = M.Map Creature BS.ByteString
 data Run = Run {environments :: [Environment Creature]}
   deriving (Generic)
 
+data SnapShot = Snap {environment :: Environment Creature, bytes :: Bytes}
+  deriving (Show)
+
 instance ToJSON Run
 
 changeRegister :: Creature -> Double -> Creature
@@ -105,20 +108,20 @@ initEnvironment gen n l s = do
 -- | Mutates the the creatures in the environment.
 -- It does not mutate all the creatures. I randomly chooses a number of positions from the environment.
 -- When there is a creature at these positions that creature is mutated. It is kind of like a cosmic ray.
-mutateEnvironment :: QCGen -> Environment Creature -> Ratio -> StateT Bytes IO (Environment Creature)
-mutateEnvironment gen env ratio = do
+mutateEnvironment :: QCGen -> SnapShot -> Ratio -> IO SnapShot
+mutateEnvironment gen snap ratio = do
   let (g1, g2) = split gen
+  let env = environment snap
+  let btes = bytes snap
   let amount = round (ratio * fromIntegral (Environment.getSize env) :: Double)
   let positions = generateRandomPositions g1 env amount
   let creatures = getOrgsAt env positions
   let orgs = map snd creatures
   let pos = map fst creatures
-  mutated <- liftIO $ mutateCreatures g2 orgs
-  bytes <- get
-  let afterDeletion = deleteOrganisms bytes orgs
-  afterExtraction <- liftIO $ insertBytes mutated afterDeletion
-  put afterExtraction
-  return $ fillInOrgs env (zip pos mutated)
+  mutated <- mutateCreatures g2 orgs
+  let afterDeletion = deleteOrganisms btes orgs
+  afterExtraction <- insertBytes mutated afterDeletion
+  return $ Snap (fillInOrgs env (zip pos mutated)) afterExtraction
 
 -- | Performs sub-tree mutation of the given list of creatures.
 mutateCreatures :: QCGen -> [Creature] -> IO [Creature]
@@ -138,10 +141,10 @@ serializeEnvironment env = insertBytes creatures M.empty
 
 -- | Serializes the given list of creatures and puts the resul into the given map.
 insertBytes :: [Creature] -> Bytes -> IO Bytes
-insertBytes [] bytes = return bytes
-insertBytes (c : cs) bytes = do
+insertBytes [] btes = return btes
+insertBytes (c : cs) btes = do
   serialized <- serializeExpression (expression c) [register c]
-  insertBytes cs $ M.insert c serialized bytes
+  insertBytes cs $ M.insert c serialized btes
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> BS.ByteString -> IO Creature
@@ -150,40 +153,46 @@ executeCreature creature bstring = do
   return $ Creature (expression creature) outcome
 
 -- | Executes a list of creaturs.
-executeCreatures :: Environment Creature -> StateT Bytes IO (Environment Creature)
-executeCreatures env = do
+executeCreatures :: SnapShot -> IO SnapShot
+executeCreatures snap = do
+  let env = environment snap
+  let btes = bytes snap
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
   let positions = map fst posOrg
-  bytes <- get
-  liftIO $ print $ M.size bytes
-  executed <- liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
+  print $ M.size btes
+  executed <- sequence [executeCreature org $ extractByte org btes | org <- orgs]
   let newEnv = fillInOrgs env $ zip positions executed
   serialized <- liftIO $ serializeEnvironment newEnv
-  put serialized
-  return newEnv
+  return $ Snap newEnv serialized
 
 extractByte :: Creature -> Bytes -> BS.ByteString
-extractByte creature bytes =
-  case M.lookup creature bytes of
+extractByte creature btes =
+  case M.lookup creature btes of
     Nothing -> trace ("error " ++ show creature) $ error "Found no matching bytestring for given creature"
     Just bstring -> bstring
 
 -- | Randomly kills creatures to control the population.
 -- This is achieved by first randomly selecting the half of the position in the environment.
 -- When there is a creature at the position the creatures id killed.
-killRandom :: QCGen -> Environment Creature -> StateT Bytes IO (Environment Creature)
-killRandom gen env = do
-  bytes <- get
-  put $ deleteOrganisms bytes orgs
-  return $ nillify env positions
+killRandom :: QCGen -> SnapShot -> SnapShot
+killRandom gen snap = do
+  Snap (nillify env positions) newBtes
   where
+    env = environment snap
+    btes = bytes snap
+    newBtes = deleteOrganisms btes orgs
     positions =
       generateRandomPositions gen env (round (0.5 * fromIntegral (Environment.getSize env) :: Double))
     orgs = getOrganisms env positions
 
 deleteOrganisms :: Bytes -> [Creature] -> Bytes
 deleteOrganisms = foldl (flip M.delete)
+
+checkBytes :: Environment Creature -> Bytes -> Bool
+checkBytes env b = and [M.member creature b | creature <- creatures]
+  where
+    creatures = getAllOrgs env
 
 -- | Returms True if the given creature is able to reproduce.
 reproducable :: Creature -> Bool
@@ -211,7 +220,7 @@ reproduceList gen env (o : os) = do
           then selectPosition g2 $ getNeighbours env pos
           else selectPosition g2 nils
   if reproducable creature
-    then insertOrganismAt rest creature <$> childPos
+    then trace "reproducing right now" $ insertOrganismAt rest creature <$> childPos
     else return rest
 
 -- | randomly switches the register of the creature at .e given position
@@ -238,13 +247,15 @@ switchRegister gen env pos =
 -- Secondly the creatures in the environment are executed and their register is updated.
 -- Thirdly the environment is mutated.
 -- Lastly the reproducable creatures are reproduced in the environment.
-run :: Environment Creature -> QCGen -> Ratio -> Int -> StateT Bytes IO [Environment Creature]
-run env _ _ 0 = do
-  liftIO $ print "The end"
-  liftIO $ print env
+run :: SnapShot -> QCGen -> Ratio -> Int -> IO [Environment Creature]
+run snap _ _ 0 = do
+  let env = environment snap
+  print "The end"
+  print env
   return [env]
-run env gen ratio n = do
-  liftIO $ print n
+run snap gen ratio n = do
+  print n
+  let env = environment snap
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
@@ -252,39 +263,47 @@ run env gen ratio n = do
   let nxt = n -1
   case modulo of
     0 ->
-      if length orgs
-        > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
-        then do
-          liftIO $ print "The Reaper"
-          killedEnv <- killRandom g1 env
-          liftIO $ print killedEnv
-          killedRun <- run killedEnv g2 ratio nxt
-          return $ killedEnv : killedRun
-        else do
-          liftIO $ print "The Reaper"
-          liftIO $ print env
-          rest <- run env g2 ratio nxt
-          return $ env : rest
+      print "The Reaper"
+        >> if length orgs
+          > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
+          then do
+            let killedSnap = killRandom g1 snap
+            let newEnv = environment killedSnap
+            print newEnv
+            print $ checkBytes newEnv $ bytes killedSnap
+            killedRun <- run killedSnap g2 ratio nxt
+            return $ newEnv : killedRun
+          else do
+            print env
+            print $ checkBytes env $ bytes snap
+            rest <- run snap g2 ratio nxt
+            return $ env : rest
     3 -> do
-      liftIO $ print "Execution"
-      liftIO $ print $ length orgs
-      bytes <- get
-      liftIO $ print $ M.keys bytes
-      newEnv <- executeCreatures env
-      liftIO $ print newEnv
-      rest <- run newEnv g2 ratio nxt
+      print "Execution"
+      print $ length orgs
+      newSnap <- executeCreatures snap
+      let newEnv = environment newSnap
+      print newEnv
+      print $ checkBytes newEnv $ bytes newSnap
+      print "again Execution"
+      rest <- run newSnap g2 ratio nxt
       return $ newEnv : rest
     2 -> do
-      liftIO $ print "Mutation"
-      newEnv <- mutateEnvironment g1 env ratio
-      liftIO $ print newEnv
-      rest <- run newEnv g2 ratio nxt
+      print "Mutation"
+      newSnap <- mutateEnvironment g1 snap ratio
+      let newEnv = environment newSnap
+      print newEnv
+      print $ checkBytes newEnv $ bytes newSnap
+      rest <- run newSnap g2 ratio nxt
       return $ newEnv : rest
     _ -> do
-      liftIO $ print "Reproduction"
-      newEnv <- liftIO $ reproduce g1 env
-      liftIO $ print newEnv
-      rest <- run newEnv g2 ratio nxt
+      print "Reproduction"
+      newEnv <- reproduce g1 env
+      print newEnv
+      serialized <- serializeEnvironment newEnv
+      let newSnap = Snap newEnv serialized
+      print $ checkBytes newEnv serialized
+      rest <- run newSnap g2 ratio nxt
       return $ newEnv : rest
 
 -- | The main function.
@@ -296,8 +315,9 @@ mainCreature seed mutationRatio start iterations = do
   print "Init"
   print env
   initMap <- serializeEnvironment env
-  runStateT (run env g2 mutationRatio (iterations * 4)) initMap
+  let firstSnap = Snap env initMap
+  run firstSnap g2 mutationRatio (iterations * 4)
   print "the end"
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 50
