@@ -46,7 +46,7 @@ instance Organism Creature where
 
 instance Show Creature where
   show (Creature e r) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r
 
 type GenotypePop = [(String, Int)]
 
@@ -113,26 +113,21 @@ mutateEnvironment gen env ratio = do
   let creatures = getOrgsAt env positions
   let orgs = map snd creatures
   let pos = map fst creatures
-  mutated <- mutateCreatures g2 orgs
+  mutated <- liftIO $ mutateCreatures g2 orgs
   bytes <- get
   let afterDeletion = deleteOrganisms bytes orgs
-  let afterInsertion = liftIO $ insertBytes mutated afterDeletion
-  afterExtraction <- afterInsertion
+  afterExtraction <- liftIO $ insertBytes mutated afterDeletion
   put afterExtraction
   return $ fillInOrgs env (zip pos mutated)
 
--- | Performs sun-tree mutation of the given list of creatures.
-mutateCreatures :: QCGen -> [Creature] -> StateT Bytes IO [Creature]
+-- | Performs sub-tree mutation of the given list of creatures.
+mutateCreatures :: QCGen -> [Creature] -> IO [Creature]
 mutateCreatures _ [] = liftIO $ return []
 mutateCreatures gen (o : os) = do
   let (g1, g2) = split gen
   let r = register o
-  e <- liftIO $ subTreeMutation g1 (expression o) 1
+  e <- subTreeMutation g1 (expression o) 1
   rest <- mutateCreatures g2 os
-  serialized <- liftIO $ serializeExpression e [r]
-  bytes <- get
-  let newBytes = M.delete o bytes
-  put $ M.insert o serialized newBytes
   return $ Creature e r : rest
 
 -- | Serializes the creatures in the given environment into a Map.
@@ -155,15 +150,23 @@ executeCreature creature bstring = do
   return $ Creature (expression creature) outcome
 
 -- | Executes a list of creaturs.
-executeCreatures :: [Creature] -> StateT Bytes IO [Creature]
-executeCreatures orgs = do
+executeCreatures :: Environment Creature -> StateT Bytes IO (Environment Creature)
+executeCreatures env = do
+  let posOrg = getOrgsPos env
+  let orgs = map snd posOrg
+  let positions = map fst posOrg
   bytes <- get
-  liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
+  liftIO $ print $ M.size bytes
+  executed <- liftIO $ sequence [executeCreature org $ extractByte org bytes | org <- orgs]
+  let newEnv = fillInOrgs env $ zip positions executed
+  serialized <- liftIO $ serializeEnvironment newEnv
+  put serialized
+  return newEnv
 
 extractByte :: Creature -> Bytes -> BS.ByteString
 extractByte creature bytes =
   case M.lookup creature bytes of
-    Nothing -> error "Found no matching bytestring for given creature"
+    Nothing -> trace ("error " ++ show creature) $ error "Found no matching bytestring for given creature"
     Just bstring -> bstring
 
 -- | Randomly kills creatures to control the population.
@@ -245,7 +248,6 @@ run env gen ratio n = do
   let (g1, g2) = split gen
   let posOrg = getOrgsPos env
   let orgs = map snd posOrg
-  let positions = map fst posOrg
   let modulo = mod n 4
   let nxt = n -1
   case modulo of
@@ -255,8 +257,6 @@ run env gen ratio n = do
         then do
           liftIO $ print "The Reaper"
           killedEnv <- killRandom g1 env
-          bytes <- liftIO $ serializeEnvironment killedEnv
-          put bytes
           liftIO $ print killedEnv
           killedRun <- run killedEnv g2 ratio nxt
           return $ killedEnv : killedRun
@@ -267,11 +267,10 @@ run env gen ratio n = do
           return $ env : rest
     3 -> do
       liftIO $ print "Execution"
-      executed <- executeCreatures orgs
-      liftIO $ print executed
-      let newEnv = fillInOrgs env $ zip positions executed
-      bytes <- liftIO $ serializeEnvironment newEnv
-      put bytes
+      liftIO $ print $ length orgs
+      bytes <- get
+      liftIO $ print $ M.keys bytes
+      newEnv <- executeCreatures env
       liftIO $ print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest

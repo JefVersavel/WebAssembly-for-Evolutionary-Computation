@@ -33,7 +33,7 @@ type Cell a = (Life a, [Resource])
 
 instance (Show a, Organism a) => Show (Life a) where
   show Nil = "Nil"
-  show (Org org) = genotype org
+  show (Org org) = show org
 
 -- | Represents the environment with cells and the neighbourhood and limits of the environment.
 data Environment a = Env
