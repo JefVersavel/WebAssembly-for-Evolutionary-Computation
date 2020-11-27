@@ -5,6 +5,7 @@ module Environment where
 import qualified Data.List as List
 import Data.Matrix
 import Data.Maybe
+import GeneralUtils
 import Organism
 import Seeding
 import System.Random
@@ -146,12 +147,39 @@ insertResourcesAt env res p
     lim = limits env
     hood = neighbourhood env
 
+-- | Deletes the resource at the given index
+deleteResourceIndex :: Organism a => Environment a -> Pos -> Int -> Environment a
+deleteResourceIndex env pos index =
+  case res of
+    Nothing -> env
+    Just r -> insertResourcesAt env (deleteIndex r index) pos
+  where
+    res = getResourcesAt env pos
+
+-- | Delete the given resource from the list of resources on the given position.
+deleteSubResources :: Organism a => Environment a -> Pos -> Resource -> Environment a
+deleteSubResources env pos d =
+  case res of
+    Nothing -> env
+    Just r -> insertResourcesAt env (List.delete d r) pos
+  where
+    res = getResourcesAt env pos
+
 -- | Fills in the given list of tuples with positions and resources into the environmnet.
 fillInResources :: Organism a => Environment a -> [(Pos, [Resource])] -> Environment a
 fillInResources env [] = env
 fillInResources env ((pos, res) : rst) = insertResourcesAt env' res pos
   where
     env' = fillInResources env rst
+
+-- | Adds the given resource to one of the neighbours of the given position.
+addResourceToNeighbours :: Organism a => QCGen -> Environment a -> Pos -> Resource -> IO (Environment a)
+addResourceToNeighbours gen env pos d = do
+  neighbour <- QC.generate $ useSeed gen $ QC.elements $ getNeighbours env pos
+  let res = getResourcesAt env neighbour
+  case res of
+    Nothing -> return $ insertResourcesAt env [d] pos
+    Just r -> return $ insertResourcesAt env (d : r) pos
 
 -- | Returns True if the given cell contains an organism.
 isOrg :: Organism a => Cell a -> Bool
@@ -292,7 +320,7 @@ genRanPos gen env = (x, y) : genRanPos g2 env
     (x, g1) = randomR (1, mx) gen
     (y, g2) = randomR (1, my) g1
 
--- | Generates a list of a givne length of lists of randomly generated resources
+-- | Generates a list of a given length of lists of randomly generated resources
 -- with a random length no greater than a given maximum size.
 generateResources :: QCGen -> Int -> Int -> [[Resource]]
 generateResources _ 0 _ = []

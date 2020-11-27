@@ -35,6 +35,7 @@ dependencies:
   - text
   - matrix
   - cereal
+  - data-ordlist
 
 ghc-options: -Wall
 
