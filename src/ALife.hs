@@ -150,11 +150,13 @@ executeCreatures gen env (p : ps) = do
     then executeCreatures gen env ps
     else do
       let (g1, g2) = split gen
+      let (g21, g22) = split g2
       resource <- generate $ useSeed g1 $ elements res
       newCreature <- executeCreature creature resource
       let envAfterDeletion = deleteSubResources env pos resource
-      let envAfterInsertion = insertOrganismAt envAfterDeletion newCreature pos
-      executeCreatures g2 envAfterInsertion ps
+      envAfterResourceInsertion <- insertResourceAtNeighbour g21 envAfterDeletion (register newCreature) pos
+      let envAfterInsertion = insertOrganismAt envAfterResourceInsertion newCreature pos
+      executeCreatures g22 envAfterInsertion ps
 
 -- | Returms True if the given creature is able to reproduce.
 reproducable :: Creature -> [Resource] -> Bool

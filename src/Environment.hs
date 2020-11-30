@@ -157,12 +157,27 @@ insertResourcesAt env res p
     lim = limits env
     hood = neighbourhood env
 
+-- | Insert the given resource to one of the neighbouring cells.
+insertResourceAtNeighbour :: Organism a => QCGen -> Environment a -> Resource -> Pos -> IO (Environment a)
+insertResourceAtNeighbour gen env res p = do
+  position <- QC.generate $ useSeed gen $ QC.elements $ getNeighbours env p
+  return $ addResource env position res
+
 -- | Deletes the resource at the given index
 deleteResourceIndex :: Organism a => Environment a -> Pos -> Int -> Environment a
 deleteResourceIndex env pos index =
   case res of
     Nothing -> env
     Just r -> insertResourcesAt env (deleteIndex r index) pos
+  where
+    res = getResourcesAt env pos
+
+-- | Adds the given resource to the resources at the given position.
+addResource :: Organism a => Environment a -> Pos -> Resource -> Environment a
+addResource env pos d =
+  case res of
+    Nothing -> env
+    Just r -> insertResourcesAt env (d : r) pos
   where
     res = getResourcesAt env pos
 
