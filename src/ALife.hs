@@ -16,6 +16,7 @@ import GHC.Generics
 import Generators
 import GeneticOperations
 import Organism
+import Resource
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -133,8 +134,10 @@ executeCreatures :: [Creature] -> IO [Creature]
 executeCreatures orgs = sequence [executeCreature org | org <- orgs]
 
 -- | Returms True if the given creature is able to reproduce.
-reproducable :: Creature -> Bool
-reproducable org = True -- isPrime (round (register org) :: Int)
+reproducable :: Creature -> [Resource] -> Bool
+reproducable org res = case getMatch res $ register org of
+  Nothing -> False
+  Just _ -> True
 
 -- | Randomly kills creatures to control the population.
 -- This is achieved by first randomly selecting the half of the position in the environment.
@@ -160,13 +163,14 @@ reproduceList gen env (o : os) = do
   let (g1, g2) = split gen
   rest <- reproduceList g1 env os
   let pos = fst o
+  let resources = unsafeGetResources env pos
   let creature = snd o
   let nils = getNilNeighbours env pos
   let childPos =
         if null nils
           then selectPosition g2 $ getNeighbours env pos
           else selectPosition g2 nils
-  if reproducable creature
+  if reproducable creature resources
     then insertOrganismAt rest creature <$> childPos
     else return rest
 

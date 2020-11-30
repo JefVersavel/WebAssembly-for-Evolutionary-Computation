@@ -136,6 +136,12 @@ getResourcesAt env pos = do
   cell <- getCellAt env pos
   getResources cell
 
+-- | Also returns the resources at the given position but returns an error when the position is not valid in the environemnt.
+unsafeGetResources :: Environment a -> Pos -> [Resource]
+unsafeGetResources env pos = case getResourcesAt env pos of
+  Nothing -> error "The given position is not valid in the environment"
+  Just r -> r
+
 -- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
 insertResourcesAt env res p
