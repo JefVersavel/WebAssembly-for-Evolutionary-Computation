@@ -3,13 +3,14 @@
 module WasmGenerator where
 
 import AST
-import Binaryen.Expression (Expression, binary, constFloat64, unary)
+import Binaryen.Expression (Expression, binary, constFloat64, globalGet, unary)
 import Binaryen.Function (Function, getName)
 import Binaryen.Index (Index (Index))
 import Binaryen.Module
   ( Module,
     addFunction,
     addFunctionExport,
+    addGlobal,
     create,
   )
 import Binaryen.Op
@@ -17,37 +18,40 @@ import Binaryen.Type (float64, none)
 import BinaryenTranslation
 import BinaryenUtils
 import Data.ByteString as BS (ByteString, writeFile)
+import Data.Serialize
 import Foreign
+import Foreign.C.String
+import Foreign.C.Types
 import Generators
 import Pool
 import System.Directory
 
 -- | Translates and ASTExpression to a binaryen expression and adds it to the given module.
 -- The given list of doubles is used to initialize the parameters in the ASTExpression.
-generateExpression :: Module -> [Double] -> ASTExpression -> IO Expression
+generateExpression :: Module -> [CString] -> ASTExpression -> IO Expression
 generateExpression m _ (Const d) = constFloat64 m d
-generateExpression m params (Param i) = constFloat64 m (params !! i)
-generateExpression m params (BinOp op e1 e2) = do
-  ge1 <- generateExpression m params e1
-  ge2 <- generateExpression m params e2
+generateExpression m names (Param i) = globalGet m (names !! i) float64
+generateExpression m names (BinOp op e1 e2) = do
+  ge1 <- generateExpression m names e1
+  ge2 <- generateExpression m names e2
   binary m (translateOp op) ge1 ge2
-generateExpression m params (UnOp op e) = do
-  ge <- generateExpression m params e
+generateExpression m names (UnOp op e) = do
+  ge <- generateExpression m names e
   unary m (translateOp op) ge
-generateExpression m params (RelOp op e1 e2) = do
-  ge1 <- generateExpression m params e1
-  ge2 <- generateExpression m params e2
+generateExpression m names (RelOp op e1 e2) = do
+  ge1 <- generateExpression m names e1
+  ge2 <- generateExpression m names e2
   be <- binary m (translateOp op) ge1 ge2
   unary m convertUInt32ToFloat64 be
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
-generateExpressions :: [Module] -> [Double] -> IO [Expression]
-generateExpressions mods params = do
-  exprs <- genASTExpressions 10 5 (length params) 0.5 4
-  sequence [generateExpression m params e | (e, m) <- zip exprs mods]
+generateExpressions :: [Module] -> [CString] -> IO [Expression]
+generateExpressions mods names = do
+  exprs <- genASTExpressions 10 5 (length names) 0.5 4
+  sequence [generateExpression m names e | (e, m) <- zip exprs mods]
 
 -- | Translates an ASTExpression to a binaryen function and adds that function the given module.
-generateFunction :: Module -> [Double] -> ASTExpression -> IO Function
+generateFunction :: Module -> [CString] -> ASTExpression -> IO Function
 generateFunction m params e = do
   pool <- newPool
   namePtr <- pooledNewByteString0 pool "main"
@@ -59,11 +63,24 @@ generateFunction m params e = do
 -- and adding that function to the default binaryen module,
 createModule :: ASTExpression -> [Double] -> IO Module
 createModule e params = do
+  names <- generateGlobalNames $ length params
   m <- create
-  function <- generateFunction m params e
+  function <- generateFunction m names e
   functionName <- getName function
   _ <- addFunctionExport m functionName functionName
+  print m
+  i <- constFloat64 m 0
+  sequence_ [addGlobal m name float64 0 i | name <- names]
+  print m
   return m
+
+-- | Generates the names for the global variables.
+generateGlobalNames :: Int -> IO [CString]
+generateGlobalNames n = do
+  pool <- newPool
+  let names = [show i | i <- [0 .. n - 1]]
+  print names
+  sequence [pooledNewByteString0 pool $ encode name | name <- names]
 
 -- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.
 createWasmFiles :: [ASTExpression] -> [Double] -> IO [(ASTExpression, String)]
@@ -72,7 +89,9 @@ createWasmFiles exprs params = do
   mods <- sequence [createModule e params | e <- exprs]
   let fileNames =
         [dir ++ "p" ++ show i ++ ".wasm" | i <- [0 .. (length mods - 1)]]
+  print fileNames
   serializedMods <- sequence [serializeModule m | m <- mods]
+  print serializedMods
   oldFiles <- listDirectory dir
   let oldFileNames = [dir ++ f | f <- oldFiles]
   putStrLn "removing files:"
@@ -112,6 +131,6 @@ removeAllFiles = foldr ((>>) . removeFile) (return ())
 
 test :: IO [(ASTExpression, String)]
 test = do
-  let params = [0.913487512345, 234.345, 34.12, 973456.2, -78764.2]
-  exprs <- genASTExpressions 10 5 (length params) 0.5 6
+  let params = [0.913487512345]
+  exprs <- genASTExpressions 10 1 (length params) 0.5 6
   createWasmFiles exprs params
