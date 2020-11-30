@@ -89,6 +89,10 @@ legalLimits (x, y) = x >= 0 && y >= 0
 getAllPos :: Lim -> [Pos]
 getAllPos (mx, my) = [(x, y) | x <- [1 .. mx], y <- [1 .. my]]
 
+-- | Returns all the positions in the environment in a random order.
+getPermutedPos :: QCGen -> Environment a -> IO [Pos]
+getPermutedPos gen env = QC.generate $ useSeed gen $ QC.shuffle $ getAllPos $ limits env
+
 -- | Returns the adjacent positions of a given position.
 -- The adjacent positions are are the positions above, below and next to the given position.
 adjacentPos :: Pos -> [Pos]
@@ -198,6 +202,12 @@ getOrgAt env pos = do
   cell <- getCellAt env pos
   getOrg cell
 
+-- | Returns the organism at the given position but returns and error when there is no organism at that position.
+unsafeGetOrgAt :: Organism a => Environment a -> Pos -> a
+unsafeGetOrgAt env pos = case getOrgAt env pos of
+  Nothing -> error "There was no org at the given position."
+  Just o -> o
+
 -- | Returns a list of tuples with positions with is corresponding organism for the given list of positions
 -- in the given environment.
 getOrgsAt :: Organism a => Environment a -> [Pos] -> [(Pos, a)]
@@ -248,6 +258,10 @@ getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
 -- | Returns a list of tuples with all all the organisms in the environment with its accompanying position.
 getOrgsPos :: Organism a => Environment a -> [(Pos, a)]
 getOrgsPos env = getOrgsAt env $ getAllPos $ getLim env
+
+-- | Returns a list of all the organisms with their position in random order.
+getPermutedOrgsPos :: Organism a => QCGen -> Environment a -> IO [(Pos, a)]
+getPermutedOrgsPos gen env = QC.generate $ useSeed gen $ QC.shuffle $ getOrgsPos env
 
 -- | Deletes organism at the given position.
 deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a

@@ -17,6 +17,7 @@ import Generators
 import GeneticOperations
 import Organism
 import Resource
+import Seeding
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -123,15 +124,37 @@ mutateCreatures gen (o : os) = do
   serialized <- serializeExpression e [r]
   return $ Creature e serialized r : rest
 
--- | Executes the given list of creatures by updating its register with the outcome of the execution.
-executeCreature :: Creature -> IO Creature
-executeCreature (Creature e b _) = do
-  outcome <- executeModule b
-  return $ Creature e b outcome
+-- | Executes all the creatures in the environment if they ar eexecutable.
+executeEnvironment :: QCGen -> Environment Creature -> IO (Environment Creature)
+executeEnvironment gen env = do
+  let (g1, g2) = split gen
+  pos <- getPermutedOrgsPos g1 env
+  executeCreatures g2 env pos
 
--- | Executes a list of creaturs.
-executeCreatures :: [Creature] -> IO [Creature]
-executeCreatures orgs = sequence [executeCreature org | org <- orgs]
+-- | Executes the given list of creatures by updating its register with the outcome of the execution.
+executeCreature :: Creature -> Resource -> IO Creature
+executeCreature creature res = do
+  let expr = expression creature
+  serialized <- serializeExpression expr [res]
+  outcome <- executeModule serialized
+  return $ Creature expr serialized outcome
+
+-- | Executes the creatures in the environemt if the have resources in their cell.
+executeCreatures :: QCGen -> Environment Creature -> [(Pos, Creature)] -> IO (Environment Creature)
+executeCreatures _ env [] = return env
+executeCreatures gen env (p : ps) = do
+  let pos = fst p
+  let creature = snd p
+  let res = unsafeGetResources env pos
+  if null res
+    then executeCreatures gen env ps
+    else do
+      let (g1, g2) = split gen
+      resource <- generate $ useSeed g1 $ elements res
+      newCreature <- executeCreature creature resource
+      let envAfterDeletion = deleteSubResources env pos resource
+      let envAfterInsertion = insertOrganismAt envAfterDeletion newCreature pos
+      executeCreatures g2 envAfterInsertion ps
 
 -- | Returms True if the given creature is able to reproduce.
 reproducable :: Creature -> [Resource] -> Bool
@@ -227,8 +250,7 @@ run env gen ratio n = do
             return $ env : rest
     3 -> do
       print "Execution"
-      executed <- executeCreatures orgs
-      let newEnv = fillInOrgs env $ zip positions executed
+      newEnv <- executeEnvironment g1 env
       print newEnv
       rest <- run newEnv g2 ratio nxt
       return $ newEnv : rest
@@ -256,4 +278,4 @@ mainCreature seed mutationRatio start iterations = do
   run env g2 mutationRatio (iterations * 4)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 50
+testCreature = mainCreature 10 0.5 0.5 10
