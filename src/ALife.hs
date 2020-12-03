@@ -27,7 +27,8 @@ import WasmGenerator
 data Creature = Creature
   { expression :: ASTExpression, -- The expression that represents the program of the creature.
     bytes :: BS.ByteString, -- The bytestring that is serialized from the expression.
-    register :: Double -- Stores the value of the register that contains the state of the creature.
+    register :: Double, -- Stores the value of the register that contains the state of the creature.
+    age :: Int
   }
   deriving (Eq, Generic)
 
@@ -46,15 +47,21 @@ instance Organism Creature where
         ++ show (getMaxDepth $ expression creature)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
+  executable creature = age creature > 5
 
 instance Show Creature where
-  show (Creature e _ r) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+  show (Creature e _ r a) =
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
+-- | Ages the creature by one.
+grow :: Creature -> Creature
+grow (Creature e b r a) = Creature e b r $ a + 1
+
+-- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e b _) = Creature e b
+changeRegister (Creature e b _ a) r = Creature e b r a
 
 -- | Returns a random register for the creature in the environment at the given position.
 -- The random register is uniformly selected from the register of the creature and the resources,
@@ -85,7 +92,7 @@ generateInitPop gen start lim = do
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
   serialized <- sequence [serializeExpression e [st] | (e, st) <- zip ex starts]
-  return [Creature e ser st | ((e, ser), st) <- zip (zip ex serialized) starts]
+  return [Creature e ser st 0 | ((e, ser), st) <- zip (zip ex serialized) starts]
 
 -- | Generates a list of random values for the registers of the creatures with a given bound and size of that list.
 generateStart :: QCGen -> Size -> Double -> [Double]
@@ -98,6 +105,13 @@ initEnvironment gen n l s = do
   let (g1, g2) = split gen
   pop <- generateInitPop g1 s l
   initializeEnvironment n g2 pop l
+
+-- | Increases the age of all the creatures in the environment.
+growEnvironment :: Environment Creature -> Environment Creature
+growEnvironment env = fillInOrgs env aged
+  where
+    posOrgs = getOrgsPos env
+    aged = [(p, grow c) | (p, c) <- posOrgs]
 
 -- | Mutates the the creatures in the environment.
 -- It does not mutate all the creatures. I randomly chooses a number of positions from the environment.
@@ -122,7 +136,7 @@ mutateCreatures gen (o : os) = do
   e <- subTreeMutation g1 (expression o) 1
   rest <- mutateCreatures g2 os
   serialized <- serializeExpression e [r]
-  return $ Creature e serialized r : rest
+  return $ Creature e serialized r (age o) : rest
 
 -- | Executes all the creatures in the environment if they ar eexecutable.
 executeEnvironment :: QCGen -> Environment Creature -> IO (Environment Creature)
@@ -137,7 +151,7 @@ executeCreature creature res = do
   let expr = expression creature
   serialized <- serializeExpression expr [res]
   outcome <- executeModule serialized
-  return $ Creature expr serialized outcome
+  return $ Creature expr serialized outcome $ age creature
 
 -- | Executes the creatures in the environemt if the have resources in their cell.
 executeCreatures :: QCGen -> Environment Creature -> [(Pos, Creature)] -> IO (Environment Creature)
