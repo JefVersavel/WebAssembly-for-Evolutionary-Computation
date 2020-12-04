@@ -18,6 +18,7 @@ import GeneticOperations
 import Organism
 import Resource
 import Seeding
+import SysCall
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -47,7 +48,7 @@ instance Organism Creature where
         ++ show (getMaxDepth $ expression creature)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
-  executable creature = age creature > 5
+  executable creature = age creature > 1
 
 instance Show Creature where
   show (Creature e _ r a) =
@@ -58,6 +59,10 @@ type GenotypePop = [(String, Int)]
 -- | Ages the creature by one.
 grow :: Creature -> Creature
 grow (Creature e b r a) = Creature e b r $ a + 1
+
+-- | Returns the same creature but with age 0
+reborn :: Creature -> Creature
+reborn (Creature e b r _) = Creature e b r 0
 
 -- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
@@ -188,10 +193,15 @@ killRandom gen env = nillify env positions
       generateRandomPositions gen env (round (0.5 * fromIntegral (Environment.getSize env) :: Double))
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
-reproduce :: QCGen -> Environment Creature -> IO (Environment Creature)
-reproduce gen env = do
-  let orgs = getOrgsPos env
-  reproduceList gen env orgs
+reproduce :: QCGen -> Environment Creature -> Creature -> Pos -> IO (Environment Creature)
+reproduce gen env creature pos = do
+  let nils = getNilNeighbours env pos
+  let newCreature = reborn creature
+  childPos <-
+    if null nils
+      then selectPosition gen $ getNeighbours env pos
+      else selectPosition gen nils
+  return $ insertOrganismAt env newCreature childPos
 
 -- | Takes a list of creatures with their position and reproduces them if they are able to.
 -- The newly produces creature is inserted either on an empty neighbouring position or
@@ -232,6 +242,11 @@ switchRegister gen env pos =
     org = getOrgAt env pos
     resources = getResourcesAt env pos
 
+perfromAction :: QCGen -> Environment Creature -> Creature -> Pos -> Double -> IO (Environment Creature)
+perfromAction gen env creature pos outcome = case toSysCall outcome of
+  Reproduction -> reproduce gen env creature pos
+  None -> return env
+
 -- | Performs a run.
 -- First the Reaper is invoked and randomly kills creature if the environment is more than 80% full.
 -- Secondly the creatures in the environment are executed and their register is updated.
@@ -248,7 +263,8 @@ run env gen pos n = do
     then do
       let creature = unsafeGetOrgAt env pos
       let agedCreature = grow creature
-      if hasResources env pos
+      print agedCreature
+      if hasResources env pos && executable agedCreature
         then do
           print n
           print pos
@@ -258,9 +274,11 @@ run env gen pos n = do
           resource <- unsafeGetRandomResource env g1 pos
           print resource
           executedCreature <- executeCreature agedCreature resource
-          let envWithoutRes = deleteSubResources env pos resource
-          print $ "outcome: " ++ show (register executedCreature)
-          distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes (register executedCreature) pos
+          let outcome = register executedCreature
+          envAfterAction <- perfromAction g2 env executedCreature pos outcome
+          let envWithoutRes = deleteSubResources envAfterAction pos resource
+          print $ "outcome: " ++ show outcome
+          distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
           let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
           print envAfterInsertion
           rest <- run envAfterInsertion g22 nextPos $ n - 1
@@ -280,4 +298,4 @@ mainCreature seed mutationRatio start iterations = do
   run env g2 first (iterations * Environment.getSize env)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 6
