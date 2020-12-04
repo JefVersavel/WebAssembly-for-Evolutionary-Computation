@@ -388,8 +388,8 @@ initializeEnvironment n gen orgList lim = do
   let (g1, g2) = R.split gen
   posOrgs <- distribute gen orgList lim
   let env = fillInOrgs (empty lim n) posOrgs
-  let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.5
-  let resources = generateResources g1 amount 3
+  let amount = floor $ (fromIntegral (getSize env) :: Double) * 1
+  let resources = generateResources g1 amount 1
   posRes <- distribute g2 resources lim
   let newEnv = fillInResources env posRes
   return newEnv
@@ -411,6 +411,12 @@ genRanPos gen env = (x, y) : genRanPos g2 env
     (x, g1) = R.randomR (1, mx) gen
     (y, g2) = R.randomR (1, my) g1
 
+bottom :: Double
+bottom = - 999
+
+top :: Double
+top = 999
+
 -- | Generates a list of a given length of lists of randomly generated resources
 -- with a random length no greater than a given maximum size.
 generateResources :: QCGen -> Int -> Int -> [[Resource]]
@@ -419,4 +425,4 @@ generateResources gen amount m = take randomSize infinteList : generateResources
   where
     (g1, g2) = R.split gen
     (randomSize, g3) = R.randomR (1, m) g1
-    infinteList = R.randoms g2
+    infinteList = R.randomRs (bottom, top) g2

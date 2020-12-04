@@ -244,25 +244,29 @@ run env _ _ 0 = do
   return [env]
 run env gen pos n = do
   let nextPos = Environment.next env pos
-  if not (hasOrg env pos && hasResources env pos)
-    then run env gen nextPos $ n - 1
-    else do
-      print n
-      print pos
-      let (g1, g2) = split gen
-      let (g21, g22) = split g2
+  if hasOrg env pos
+    then do
       let creature = unsafeGetOrgAt env pos
-      print creature
-      resource <- unsafeGetRandomResource env g1 pos
-      print resource
-      executedCreature <- executeCreature creature resource
-      let envWithoutRes = deleteSubResources env pos resource
-      print $ "outcome: " ++ show (register executedCreature)
-      distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes (register executedCreature) pos
-      let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
-      print envAfterInsertion
-      rest <- run envAfterInsertion g22 nextPos $ n - 1
-      return $ envAfterInsertion : rest
+      let agedCreature = grow creature
+      if hasResources env pos
+        then do
+          print n
+          print pos
+          let (g1, g2) = split gen
+          let (g21, g22) = split g2
+          print agedCreature
+          resource <- unsafeGetRandomResource env g1 pos
+          print resource
+          executedCreature <- executeCreature agedCreature resource
+          let envWithoutRes = deleteSubResources env pos resource
+          print $ "outcome: " ++ show (register executedCreature)
+          distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes (register executedCreature) pos
+          let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
+          print envAfterInsertion
+          rest <- run envAfterInsertion g22 nextPos $ n - 1
+          return $ envAfterInsertion : rest
+        else run env gen nextPos $ n - 1
+    else run env gen nextPos $ n - 1
 
 -- | The main function.
 mainCreature :: Seed -> Double -> Double -> Int -> IO ()
@@ -276,4 +280,4 @@ mainCreature seed mutationRatio start iterations = do
   run env g2 first (iterations * Environment.getSize env)
   return ()
 
-testCreature = mainCreature 125110 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 10
