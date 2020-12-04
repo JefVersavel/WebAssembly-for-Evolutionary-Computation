@@ -237,51 +237,32 @@ switchRegister gen env pos =
 -- Secondly the creatures in the environment are executed and their register is updated.
 -- Thirdly the environment is mutated.
 -- Lastly the reproducable creatures are reproduced in the environment.
-run :: Environment Creature -> QCGen -> Ratio -> Int -> IO [Environment Creature]
+run :: Environment Creature -> QCGen -> Pos -> Int -> IO [Environment Creature]
 run env _ _ 0 = do
   print "End"
   print env
   return [env]
-run env gen ratio n = do
-  print n
-  let (g1, g2) = split gen
-  let posOrg = getOrgsPos env
-  let orgs = map snd posOrg
-  let positions = map fst posOrg
-  let modulo = mod n 4
-  let nxt = n -1
-  case modulo of
-    0 ->
-      print "Reaper"
-        >> if length orgs
-          > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
-          then do
-            let killedEnv = killRandom g1 env
-            print killedEnv
-            killedRun <- run killedEnv g2 ratio nxt
-            return $ killedEnv : killedRun
-          else do
-            print env
-            rest <- run env g2 ratio nxt
-            return $ env : rest
-    3 -> do
-      print "Execution"
-      newEnv <- executeEnvironment g1 env
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
-    2 -> do
-      print "Mutation"
-      newEnv <- mutateEnvironment g1 env ratio
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
-    _ -> do
-      print "reproduction"
-      newEnv <- reproduce g1 env
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
+run env gen pos n = do
+  let nextPos = Environment.next env pos
+  if not (hasOrg env pos && hasResources env pos)
+    then run env gen nextPos $ n - 1
+    else do
+      print n
+      print pos
+      let (g1, g2) = split gen
+      let (g21, g22) = split g2
+      let creature = unsafeGetOrgAt env pos
+      print creature
+      resource <- unsafeGetRandomResource env g1 pos
+      print resource
+      executedCreature <- executeCreature creature resource
+      let envWithoutRes = deleteSubResources env pos resource
+      print $ "outcome: " ++ show (register executedCreature)
+      distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes (register executedCreature) pos
+      let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
+      print envAfterInsertion
+      rest <- run envAfterInsertion g22 nextPos $ n - 1
+      return $ envAfterInsertion : rest
 
 -- | The main function.
 mainCreature :: Seed -> Double -> Double -> Int -> IO ()
@@ -291,7 +272,8 @@ mainCreature seed mutationRatio start iterations = do
   env <- initEnvironment g1 Moore lim start
   print "Init"
   print env
-  run env g2 mutationRatio (iterations * 4)
+  let first = firstPos
+  run env g2 first (iterations * Environment.getSize env)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 125110 0.5 0.5 10

@@ -182,13 +182,17 @@ getResourcesAt env pos = do
 hasResources :: Environment a -> Pos -> Bool
 hasResources env pos = case getResourcesAt env pos of
   Nothing -> False
-  Just _ -> True
+  Just r -> not $ null r
 
 -- | Also returns the resources at the given position but returns an error when the position is not valid in the environemnt.
 unsafeGetResources :: Environment a -> Pos -> [Resource]
 unsafeGetResources env pos = case getResourcesAt env pos of
   Nothing -> error "The given position is not valid in the environment"
   Just r -> r
+
+-- | Returns a random resource at the given position.
+unsafeGetRandomResource :: Environment a -> QCGen -> Pos -> IO Resource
+unsafeGetRandomResource env gen pos = QC.generate $ useSeed gen $ QC.elements $ unsafeGetResources env pos
 
 -- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
@@ -205,6 +209,7 @@ insertResourcesAt env res p
 insertResourceAtNeighbour :: Organism a => QCGen -> Environment a -> Resource -> Pos -> IO (Environment a)
 insertResourceAtNeighbour gen env res p = do
   position <- QC.generate $ useSeed gen $ QC.elements $ getNeighbours env p
+  print position
   return $ addResource env position res
 
 -- | Deletes the resource at the given index
@@ -383,7 +388,7 @@ initializeEnvironment n gen orgList lim = do
   let (g1, g2) = R.split gen
   posOrgs <- distribute gen orgList lim
   let env = fillInOrgs (empty lim n) posOrgs
-  let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.1
+  let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.5
   let resources = generateResources g1 amount 3
   posRes <- distribute g2 resources lim
   let newEnv = fillInResources env posRes
