@@ -8,6 +8,7 @@ import AST
 import qualified ASTRepresentation as Rep
 import Data.Aeson
 import qualified Data.ByteString as BS
+import qualified Data.List as List
 import Data.Numbers.Primes
 import qualified Data.Text as T
 import Environment
@@ -52,7 +53,7 @@ instance Organism Creature where
 
 instance Show Creature where
   show (Creature e _ r a) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "age= " ++ show a ++ "\n"
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
@@ -242,10 +243,37 @@ switchRegister gen env pos =
     org = getOrgAt env pos
     resources = getResourcesAt env pos
 
+-- | Performs an action on the environment based on the outcome of the execution of the creature.
 perfromAction :: QCGen -> Environment Creature -> Creature -> Pos -> Double -> IO (Environment Creature)
 perfromAction gen env creature pos outcome = case toSysCall outcome of
-  Reproduction -> reproduce gen env creature pos
+  Reproduction -> print "reproducing" >> reproduce gen env creature pos
   None -> return env
+
+-- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
+getAgePos :: Environment Creature -> [(Int, Gen Pos)]
+getAgePos env = [(age creature, return pos) | (pos, creature) <- getOrgsPos env]
+
+-- | Generates an infiniteList with positions of killable organisms.
+generateInfiniteKillList :: Environment Creature -> IO [Pos]
+generateInfiniteKillList env = do
+  pos <- generate $ frequency $ getAgePos env
+  rest <- generateInfiniteKillList env
+  return $ pos : rest
+
+-- | Kills a given amount of organisms in the environment.
+kill :: Environment Creature -> Int -> IO (Environment Creature)
+kill env amount = do
+  positions <- generateInfiniteKillList env
+  let killPositions = take amount $ List.nub positions
+  return $ nillify env killPositions
+
+-- | returns true if for the given total and current amount of organisms in the evironment, there is overpopulation.
+killable :: Int -> Int -> Bool
+killable total amount = ((fromIntegral amount :: Double) / fromIntegral total) > 0.9
+
+-- | Kills returns if their is overpopulation in the environment.
+killableEnv :: Environment Creature -> Bool
+killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
 
 -- | Performs a run.
 -- First the Reaper is invoked and randomly kills creature if the environment is more than 80% full.
@@ -263,14 +291,14 @@ run env gen pos n = do
     then do
       let creature = unsafeGetOrgAt env pos
       let agedCreature = grow creature
-      print agedCreature
       if hasResources env pos && executable agedCreature
         then do
           print n
           print pos
           let (g1, g2) = split gen
           let (g21, g22) = split g2
-          print agedCreature
+          print $ expression agedCreature
+          -- print agedCreature
           resource <- unsafeGetRandomResource env g1 pos
           print resource
           executedCreature <- executeCreature agedCreature resource
@@ -280,10 +308,20 @@ run env gen pos n = do
           print $ "outcome: " ++ show outcome
           distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
           let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
-          print envAfterInsertion
-          rest <- run envAfterInsertion g22 nextPos $ n - 1
-          return $ envAfterInsertion : rest
-        else run env gen nextPos $ n - 1
+          -- print envAfterInsertion
+          let total = Environment.getSize envAfterInsertion
+          let current = length $ getAllOrgs envAfterInsertion
+          if killable total current
+            then do
+              envAfterKilled <- kill envAfterInsertion $ div current 2
+              print envAfterKilled
+              rest <- run envAfterKilled g22 nextPos $ n - 1
+              return $ envAfterKilled : rest
+            else do
+              print envAfterInsertion
+              rest <- run envAfterInsertion g22 nextPos $ n - 1
+              return $ envAfterInsertion : rest
+        else run (insertOrganismAt env agedCreature pos) gen nextPos $ n - 1
     else run env gen nextPos $ n - 1
 
 -- | The main function.
