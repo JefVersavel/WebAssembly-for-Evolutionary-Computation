@@ -6,6 +6,7 @@ module ALife_1 where
 
 import AST
 import qualified ASTRepresentation as Rep
+import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
@@ -195,12 +196,6 @@ mainMVP seed d ratio mutationRatio s maxSize start = do
   let exprs = orgListToExprs finalOrgs
   let runs = MVPRun seed d ratio mutationRatio s maxSize start $ shortenListList finalOrgs
   let name = getName runs
-  encodeRun runs
-  decodedRuns <- decodeRun name :: IO MVPRun
-  print decodedRuns
-  createPieCharts (getOrgList decodedRuns) (getName decodedRuns)
-  mainchart exprs
-  let path = "./src/tests/" ++ name
-  writeFile path (fancyShowList finalOrgs)
+  A.encodeFile ("json/" ++ show name) $ countGenotypes $ getOrgList runs
 
 testMVP = mainMVP 10 5 0.5 0.5 10 10 10

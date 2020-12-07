@@ -7,3 +7,5 @@ src/tests/
 graphics
 *.png
 serialized/
+
+json/
