@@ -20,12 +20,12 @@ executeModule bytes global =
         session
         [js|
   const typedArray = new Uint8Array($program);
-  const third = new WebAssembly.Global({
+  const externalName  = new WebAssembly.Global({
     value: 'f64',
     mutable: false 
   }, $val);
   let importObject = {
-    second : {third}
+    externalModuleName : {externalName}
   };  
   return WebAssembly.instantiate(typedArray,importObject).then(result => {
     return result.instance.exports.main();
