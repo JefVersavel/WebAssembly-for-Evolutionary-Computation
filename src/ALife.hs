@@ -29,6 +29,7 @@ import WasmGenerator
 data Creature = Creature
   { expression :: ASTExpression, -- The expression that represents the program of the creature.
     register :: Double, -- Stores the value of the register that contains the state of the creature.
+    bytestring :: BS.ByteString,
     age :: Int
   }
   deriving (Eq, Generic)
@@ -51,22 +52,22 @@ instance Organism Creature where
   executable creature = age creature > 1
 
 instance Show Creature where
-  show (Creature e r a) =
+  show (Creature e r _ a) =
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
 -- | Ages the creature by one.
 grow :: Creature -> Creature
-grow (Creature e r a) = Creature e r $ a + 1
+grow (Creature e r b a) = Creature e r b $ a + 1
 
 -- | Returns the same creature but with age 0
 reborn :: Creature -> Creature
-reborn (Creature e r _) = Creature e r 0
+reborn (Creature e r b _) = Creature e r b 0
 
 -- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e _ a) r = Creature e r a
+changeRegister (Creature e _ b a) r = Creature e r b a
 
 -- | Returns a random register for the creature in the environment at the given position.
 -- The random register is uniformly selected from the register of the creature and the resources,
@@ -96,7 +97,8 @@ generateInitPop gen start lim = do
   let (g1, g2) = split gen
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
-  return [Creature e st 0 | (e, st) <- zip ex starts]
+  serializeds <- serializeExpressions ex 1
+  return [Creature e st b 0 | ((e, st), b) <- zip (zip ex starts) (map snd serializeds)]
 
 -- | Generates a list of random values for the registers of the creatures with a given bound and size of that list.
 generateStart :: QCGen -> Size -> Double -> [Double]
@@ -115,15 +117,15 @@ mutateCreature :: QCGen -> Creature -> IO Creature
 mutateCreature gen creature = do
   let r = register creature
   e <- subTreeMutation gen (expression creature) 1
-  return $ Creature e r (age creature)
+  serialized <- serializeExpression e 1
+  return $ Creature e r serialized (age creature)
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> Resource -> IO Creature
 executeCreature creature res = do
-  let expr = expression creature
-  serialized <- serializeExpression expr [res]
-  outcome <- executeModule serialized
-  return $ Creature expr outcome $ age creature
+  let serialized = bytestring creature
+  outcome <- executeModule serialized res
+  return $ changeRegister creature outcome
 
 mutationChance :: Int
 mutationChance = 4

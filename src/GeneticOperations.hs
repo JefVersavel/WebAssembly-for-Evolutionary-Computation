@@ -182,8 +182,8 @@ editing g e params = do
 -- | Executes an expression and returns its return value.
 executeSubTree :: ASTExpression -> [Double] -> IO Double
 executeSubTree e params = do
-  serialized <- serializeExpression e params
-  executeModule serialized
+  serialized <- serializeExpression e $ length params
+  executeModule serialized $ head params
 
 testExpression :: ASTExpression
 testExpression =
