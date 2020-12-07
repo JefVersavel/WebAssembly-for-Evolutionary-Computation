@@ -8,6 +8,7 @@ import AST
 import qualified ASTRepresentation as Rep
 import Data.Aeson
 import qualified Data.ByteString as BS
+import qualified Data.List as List
 import Data.Numbers.Primes
 import qualified Data.Text as T
 import Environment
@@ -18,6 +19,7 @@ import GeneticOperations
 import Organism
 import Resource
 import Seeding
+import SysCall
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -26,8 +28,8 @@ import WasmGenerator
 -- | Data type that represents a creature in the environment.
 data Creature = Creature
   { expression :: ASTExpression, -- The expression that represents the program of the creature.
-    bytes :: BS.ByteString, -- The bytestring that is serialized from the expression.
-    register :: Double -- Stores the value of the register that contains the state of the creature.
+    register :: Double, -- Stores the value of the register that contains the state of the creature.
+    age :: Int
   }
   deriving (Eq, Generic)
 
@@ -46,15 +48,25 @@ instance Organism Creature where
         ++ show (getMaxDepth $ expression creature)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
+  executable creature = age creature > 1
 
 instance Show Creature where
-  show (Creature e _ r) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
+  show (Creature e r a) =
+    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
+-- | Ages the creature by one.
+grow :: Creature -> Creature
+grow (Creature e r a) = Creature e r $ a + 1
+
+-- | Returns the same creature but with age 0
+reborn :: Creature -> Creature
+reborn (Creature e r _) = Creature e r 0
+
+-- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e b _) = Creature e b
+changeRegister (Creature e _ a) r = Creature e r a
 
 -- | Returns a random register for the creature in the environment at the given position.
 -- The random register is uniformly selected from the register of the creature and the resources,
@@ -84,8 +96,7 @@ generateInitPop gen start lim = do
   let (g1, g2) = split gen
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
-  serialized <- sequence [serializeExpression e [st] | (e, st) <- zip ex starts]
-  return [Creature e ser st | ((e, ser), st) <- zip (zip ex serialized) starts]
+  return [Creature e st 0 | (e, st) <- zip ex starts]
 
 -- | Generates a list of random values for the registers of the creatures with a given bound and size of that list.
 generateStart :: QCGen -> Size -> Double -> [Double]
@@ -99,37 +110,12 @@ initEnvironment gen n l s = do
   pop <- generateInitPop g1 s l
   initializeEnvironment n g2 pop l
 
--- | Mutates the the creatures in the environment.
--- It does not mutate all the creatures. I randomly chooses a number of positions from the environment.
--- When there is a creature at these positions that creature is mutated. It is kind of like a cosmic ray.
-mutateEnvironment :: QCGen -> Environment Creature -> Ratio -> IO (Environment Creature)
-mutateEnvironment gen env ratio = do
-  let (g1, g2) = split gen
-  let amount = round (ratio * fromIntegral (Environment.getSize env) :: Double)
-  let positions = generateRandomPositions g1 env amount
-  let creatures = getOrgsAt env positions
-  let orgs = map snd creatures
-  let pos = map fst creatures
-  mutated <- mutateCreatures g2 orgs
-  return $ fillInOrgs env (zip pos mutated)
-
 -- | Performs sun-tree mutation of the given list of creatures.
-mutateCreatures :: QCGen -> [Creature] -> IO [Creature]
-mutateCreatures _ [] = return []
-mutateCreatures gen (o : os) = do
-  let (g1, g2) = split gen
-  let r = register o
-  e <- subTreeMutation g1 (expression o) 1
-  rest <- mutateCreatures g2 os
-  serialized <- serializeExpression e [r]
-  return $ Creature e serialized r : rest
-
--- | Executes all the creatures in the environment if they ar eexecutable.
-executeEnvironment :: QCGen -> Environment Creature -> IO (Environment Creature)
-executeEnvironment gen env = do
-  let (g1, g2) = split gen
-  pos <- getPermutedOrgsPos g1 env
-  executeCreatures g2 env pos
+mutateCreature :: QCGen -> Creature -> IO Creature
+mutateCreature gen creature = do
+  let r = register creature
+  e <- subTreeMutation gen (expression creature) 1
+  return $ Creature e r (age creature)
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> Resource -> IO Creature
@@ -137,137 +123,112 @@ executeCreature creature res = do
   let expr = expression creature
   serialized <- serializeExpression expr [res]
   outcome <- executeModule serialized
-  return $ Creature expr serialized outcome
+  return $ Creature expr outcome $ age creature
 
--- | Executes the creatures in the environemt if the have resources in their cell.
-executeCreatures :: QCGen -> Environment Creature -> [(Pos, Creature)] -> IO (Environment Creature)
-executeCreatures _ env [] = return env
-executeCreatures gen env (p : ps) = do
-  let pos = fst p
-  let creature = snd p
-  let res = unsafeGetResources env pos
-  if null res
-    then executeCreatures gen env ps
-    else do
-      let (g1, g2) = split gen
-      let (g21, g22) = split g2
-      resource <- generate $ useSeed g1 $ elements res
-      newCreature <- executeCreature creature resource
-      let envAfterDeletion = deleteSubResources env pos resource
-      envAfterResourceInsertion <- insertResourceAtNeighbour g21 envAfterDeletion (register newCreature) pos
-      let envAfterInsertion = insertOrganismAt envAfterResourceInsertion newCreature pos
-      executeCreatures g22 envAfterInsertion ps
-
--- | Returms True if the given creature is able to reproduce.
-reproducable :: Creature -> [Resource] -> Bool
-reproducable org res = case getMatch res $ register org of
-  Nothing -> False
-  Just _ -> True
-
--- | Randomly kills creatures to control the population.
--- This is achieved by first randomly selecting the half of the position in the environment.
--- When there is a creature at the position the creatures id killed.
-killRandom :: QCGen -> Environment Creature -> Environment Creature
-killRandom gen env = nillify env positions
-  where
-    positions =
-      generateRandomPositions gen env (round (0.5 * fromIntegral (Environment.getSize env) :: Double))
+mutationChance :: Int
+mutationChance = 4
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
-reproduce :: QCGen -> Environment Creature -> IO (Environment Creature)
-reproduce gen env = do
-  let orgs = getOrgsPos env
-  reproduceList gen env orgs
-
--- | Takes a list of creatures with their position and reproduces them if they are able to.
--- The newly produces creature is inserted either on an empty neighbouring position or
--- if there are none then a random neighbouring creature is replaced by the new creature.
-reproduceList :: QCGen -> Environment Creature -> [(Pos, Creature)] -> IO (Environment Creature)
-reproduceList _ env [] = return env
-reproduceList gen env (o : os) = do
-  let (g1, g2) = split gen
-  rest <- reproduceList g1 env os
-  let pos = fst o
-  let resources = unsafeGetResources env pos
-  let creature = snd o
+-- It also is poxxible by chance that the reproduced creature is mutated.
+reproduce :: QCGen -> Environment Creature -> Creature -> Pos -> IO (Environment Creature)
+reproduce gen env creature pos = do
   let nils = getNilNeighbours env pos
-  let childPos =
-        if null nils
-          then selectPosition g2 $ getNeighbours env pos
-          else selectPosition g2 nils
-  if reproducable creature resources
-    then insertOrganismAt rest creature <$> childPos
-    else return rest
+  let newCreature = reborn creature
+  let (g1, g2) = split gen
+  let (n, g3) = randomR (1, mutationChance) g1
+  childPos <-
+    if null nils
+      then selectPosition g2 $ getNeighbours env pos
+      else selectPosition g2 nils
+  print "test"
+  print n
+  if n == 1
+    then do
+      print "mutation"
+      mutated <- mutateCreature g3 newCreature
+      return $ insertOrganismAt env mutated childPos
+    else do
+      print "test test"
+      return $ insertOrganismAt env newCreature childPos
 
--- | randomly switches the register of the creature at .e given position
--- with one of the resources at that position or its own register.
--- When there is no creature or there are no resources at the position the the original environment is returned.
-switchRegister :: QCGen -> Environment Creature -> Pos -> Environment Creature
-switchRegister gen env pos =
-  case org of
-    Nothing -> env
-    Just creature ->
-      case resources of
-        Nothing -> env
-        Just resList ->
-          let totalList = register creature : resList
-              randomNb = fst $ randomR (0, length totalList - 1) gen
-              newCreature = changeRegister creature $ totalList !! randomNb
-           in insertOrganismAt env newCreature pos
-  where
-    org = getOrgAt env pos
-    resources = getResourcesAt env pos
+-- | Performs an action on the environment based on the outcome of the execution of the creature.
+perfromAction :: QCGen -> Environment Creature -> Creature -> Pos -> Double -> IO (Environment Creature)
+perfromAction gen env creature pos outcome = case toSysCall outcome of
+  Reproduction -> print "reproducing" >> reproduce gen env creature pos
+  None -> return env
+
+-- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
+getAgePos :: Environment Creature -> [(Int, Gen Pos)]
+getAgePos env = [(age creature, return pos) | (pos, creature) <- getOrgsPos env]
+
+-- | Generates an infiniteList with positions of killable organisms.
+generateInfiniteKillList :: Environment Creature -> IO [Pos]
+generateInfiniteKillList env = do
+  pos <- generate $ frequency $ getAgePos env
+  rest <- generateInfiniteKillList env
+  return $ pos : rest
+
+-- | Kills a given amount of organisms in the environment.
+kill :: Environment Creature -> Int -> IO (Environment Creature)
+kill env amount = do
+  positions <- generateInfiniteKillList env
+  let killPositions = take amount $ List.nub positions
+  return $ nillify env killPositions
+
+-- | returns true if for the given total and current amount of organisms in the evironment, there is overpopulation.
+killable :: Int -> Int -> Bool
+killable total amount = ((fromIntegral amount :: Double) / fromIntegral total) > 0.9
+
+-- | Kills returns if their is overpopulation in the environment.
+killableEnv :: Environment Creature -> Bool
+killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
 
 -- | Performs a run.
 -- First the Reaper is invoked and randomly kills creature if the environment is more than 80% full.
 -- Secondly the creatures in the environment are executed and their register is updated.
 -- Thirdly the environment is mutated.
 -- Lastly the reproducable creatures are reproduced in the environment.
-run :: Environment Creature -> QCGen -> Ratio -> Int -> IO [Environment Creature]
+run :: Environment Creature -> QCGen -> Pos -> Int -> IO [Environment Creature]
 run env _ _ 0 = do
   print "End"
   print env
   return [env]
-run env gen ratio n = do
-  print n
-  let (g1, g2) = split gen
-  let posOrg = getOrgsPos env
-  let orgs = map snd posOrg
-  let positions = map fst posOrg
-  let modulo = mod n 4
-  let nxt = n -1
-  case modulo of
-    0 ->
-      print "Reaper"
-        >> if length orgs
-          > floor (0.8 * fromIntegral (Environment.getSize env) :: Double)
-          then do
-            let killedEnv = killRandom g1 env
-            print killedEnv
-            killedRun <- run killedEnv g2 ratio nxt
-            return $ killedEnv : killedRun
-          else do
-            print env
-            rest <- run env g2 ratio nxt
-            return $ env : rest
-    3 -> do
-      print "Execution"
-      newEnv <- executeEnvironment g1 env
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
-    2 -> do
-      print "Mutation"
-      newEnv <- mutateEnvironment g1 env ratio
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
-    _ -> do
-      print "reproduction"
-      newEnv <- reproduce g1 env
-      print newEnv
-      rest <- run newEnv g2 ratio nxt
-      return $ newEnv : rest
+run env gen pos n = do
+  let nextPos = Environment.next env pos
+  if hasOrg env pos
+    then do
+      let creature = unsafeGetOrgAt env pos
+      let agedCreature = grow creature
+      if hasResources env pos && executable agedCreature
+        then do
+          print n
+          print pos
+          let (g1, g2) = split gen
+          let (g21, g22) = split g2
+          print $ expression agedCreature
+          resource <- unsafeGetRandomResource env g1 pos
+          print resource
+          executedCreature <- executeCreature agedCreature resource
+          let outcome = register executedCreature
+          envAfterAction <- perfromAction g2 env executedCreature pos outcome
+          let envWithoutRes = deleteSubResources envAfterAction pos resource
+          print $ "outcome: " ++ show outcome
+          distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
+          let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
+          let total = Environment.getSize envAfterInsertion
+          let current = length $ getAllOrgs envAfterInsertion
+          if killable total current
+            then do
+              envAfterKilled <- kill envAfterInsertion $ div current 2
+              print envAfterKilled
+              rest <- run envAfterKilled g22 nextPos $ n - 1
+              return $ envAfterKilled : rest
+            else do
+              print envAfterInsertion
+              rest <- run envAfterInsertion g22 nextPos $ n - 1
+              return $ envAfterInsertion : rest
+        else run (insertOrganismAt env agedCreature pos) gen nextPos $ n - 1
+    else run env gen nextPos $ n - 1
 
 -- | The main function.
 mainCreature :: Seed -> Double -> Double -> Int -> IO ()
@@ -277,7 +238,8 @@ mainCreature seed mutationRatio start iterations = do
   env <- initEnvironment g1 Moore lim start
   print "Init"
   print env
-  run env g2 mutationRatio (iterations * 4)
+  let first = firstPos
+  run env g2 first (iterations * Environment.getSize env)
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 15

@@ -7,6 +7,7 @@ import System.Directory
 -- | Class representing organisms with a genotype that uniquely identifies a unique creature.
 class (Show a, Eq a) => Organism a where
   genotype :: a -> String
+  executable :: a -> Bool
 
 -- | The path at which the generated charts are located.
 chartPath :: String

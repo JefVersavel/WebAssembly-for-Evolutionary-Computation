@@ -8,7 +8,7 @@ import Data.Maybe
 import GeneralUtils
 import Organism
 import Seeding
-import System.Random
+import qualified System.Random as R
 import qualified Test.QuickCheck as QC
 import Test.QuickCheck.Random
 
@@ -39,6 +39,14 @@ data Environment a = Organism a =>
 
 instance (Show a, Organism a) => Show (Environment a) where
   show env = showCells $ toLists $ grid env
+
+-- | Returns the x coordinate of the given position.
+getX :: Pos -> Int
+getX (x, _) = x
+
+-- | Returns the y coordinate of the given position.
+getY :: Pos -> Int
+getY (_, y) = y
 
 -- | Returns a textual representation of a list of rows from the grid.
 showCells :: Organism a => [[Cell a]] -> String
@@ -93,6 +101,35 @@ getAllPos (mx, my) = [(x, y) | x <- [1 .. mx], y <- [1 .. my]]
 getPermutedPos :: QCGen -> Environment a -> IO [Pos]
 getPermutedPos gen env = QC.generate $ useSeed gen $ QC.shuffle $ getAllPos $ limits env
 
+-- | Returns the first position of the matrix in the environment.
+firstPos :: Pos
+firstPos = (1, 1)
+
+-- | Returns the last postition of the matrix in the environment.
+lastPos :: Environment a -> Pos
+lastPos env = (getXLim env, getYLim env)
+
+-- | Returns the next position relative to the given postion,
+next :: Environment a -> Pos -> Pos
+next env pos
+  | pos == lastPos env = firstPos
+  | otherwise = add
+  where
+    add
+      | y < ylim = (x, y + 1)
+      | y == ylim = (x + 1, 1)
+    x = getX pos
+    y = getY pos
+    ylim = getYLim env
+
+-- | Returns the next position that has and organism and resources.
+nextOrgRes :: Organism a => Environment a -> Pos -> Pos
+nextOrgRes env pos
+  | hasOrg env nextPos && hasResources env nextPos = nextPos
+  | otherwise = nextOrgRes env nextPos
+  where
+    nextPos = next env pos
+
 -- | Returns the adjacent positions of a given position.
 -- The adjacent positions are are the positions above, below and next to the given position.
 adjacentPos :: Pos -> [Pos]
@@ -140,11 +177,22 @@ getResourcesAt env pos = do
   cell <- getCellAt env pos
   getResources cell
 
+-- | Returns true if the postion in the enbironment contains resources
+-- otherwise returns false.
+hasResources :: Environment a -> Pos -> Bool
+hasResources env pos = case getResourcesAt env pos of
+  Nothing -> False
+  Just r -> not $ null r
+
 -- | Also returns the resources at the given position but returns an error when the position is not valid in the environemnt.
 unsafeGetResources :: Environment a -> Pos -> [Resource]
 unsafeGetResources env pos = case getResourcesAt env pos of
   Nothing -> error "The given position is not valid in the environment"
   Just r -> r
+
+-- | Returns a random resource at the given position.
+unsafeGetRandomResource :: Environment a -> QCGen -> Pos -> IO Resource
+unsafeGetRandomResource env gen pos = QC.generate $ useSeed gen $ QC.elements $ unsafeGetResources env pos
 
 -- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
@@ -161,6 +209,7 @@ insertResourcesAt env res p
 insertResourceAtNeighbour :: Organism a => QCGen -> Environment a -> Resource -> Pos -> IO (Environment a)
 insertResourceAtNeighbour gen env res p = do
   position <- QC.generate $ useSeed gen $ QC.elements $ getNeighbours env p
+  print position
   return $ addResource env position res
 
 -- | Deletes the resource at the given index
@@ -216,6 +265,13 @@ getOrgAt :: Organism a => Environment a -> Pos -> Maybe a
 getOrgAt env pos = do
   cell <- getCellAt env pos
   getOrg cell
+
+-- | Returns true if the position in the environment contains an organims
+-- returns false otherwise.
+hasOrg :: Organism a => Environment a -> Pos -> Bool
+hasOrg env pos = case getOrgAt env pos of
+  Nothing -> False
+  Just _ -> True
 
 -- | Returns the organism at the given position but returns and error when there is no organism at that position.
 unsafeGetOrgAt :: Organism a => Environment a -> Pos -> a
@@ -313,7 +369,7 @@ distribute gen orgs lim = distribute' gen orgs $ getAllPos lim
 distribute' :: QCGen -> [a] -> [Pos] -> IO [(Pos, a)]
 distribute' _ [] _ = return []
 distribute' gen (o : os) list = do
-  let (g1, g2) = split gen
+  let (g1, g2) = R.split gen
   p <- QC.generate $ useSeed g1 $ QC.elements list
   let l = List.delete p list
   rest <- distribute' g2 os l
@@ -329,11 +385,11 @@ initializeEnvironment ::
   Lim ->
   IO (Environment a)
 initializeEnvironment n gen orgList lim = do
-  let (g1, g2) = split gen
+  let (g1, g2) = R.split gen
   posOrgs <- distribute gen orgList lim
   let env = fillInOrgs (empty lim n) posOrgs
-  let amount = floor $ (fromIntegral (getSize env) :: Double) * 0.1
-  let resources = generateResources g1 amount 3
+  let amount = floor $ (fromIntegral (getSize env) :: Double) * 1
+  let resources = generateResources g1 amount 1
   posRes <- distribute g2 resources lim
   let newEnv = fillInResources env posRes
   return newEnv
@@ -352,8 +408,14 @@ genRanPos gen env = (x, y) : genRanPos g2 env
   where
     mx = getXLim env
     my = getYLim env
-    (x, g1) = randomR (1, mx) gen
-    (y, g2) = randomR (1, my) g1
+    (x, g1) = R.randomR (1, mx) gen
+    (y, g2) = R.randomR (1, my) g1
+
+bottom :: Double
+bottom = - 999
+
+top :: Double
+top = 999
 
 -- | Generates a list of a given length of lists of randomly generated resources
 -- with a random length no greater than a given maximum size.
@@ -361,6 +423,6 @@ generateResources :: QCGen -> Int -> Int -> [[Resource]]
 generateResources _ 0 _ = []
 generateResources gen amount m = take randomSize infinteList : generateResources g3 (amount - 1) m
   where
-    (g1, g2) = split gen
-    (randomSize, g3) = randomR (1, m) g1
-    infinteList = randoms g2
+    (g1, g2) = R.split gen
+    (randomSize, g3) = R.randomR (1, m) g1
+    infinteList = R.randomRs (bottom, top) g2
