@@ -7,8 +7,10 @@ module ALife where
 import AST
 import qualified ASTRepresentation as Rep
 import Data.Aeson
+import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
 import qualified Data.List as List
+import Data.Matrix
 import Data.Numbers.Primes
 import qualified Data.Text as T
 import Environment
@@ -20,6 +22,7 @@ import Organism
 import Resource
 import Seeding
 import SysCall
+import System.Directory
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -34,7 +37,7 @@ data Creature = Creature
   }
   deriving (Eq, Generic)
 
-data SmallCreature = SmallCreature ASTExpression Double
+data SmallCreature = SmallCreature ASTExpression Double Int
   deriving (Eq, Generic)
 
 instance ToJSON SmallCreature
@@ -47,6 +50,8 @@ instance Organism Creature where
         ++ show (size $ expression creature)
         ++ "_"
         ++ show (getMaxDepth $ expression creature)
+        ++ "_"
+        ++ show (age creature)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
   executable creature = age creature > 1
@@ -56,6 +61,23 @@ instance Show Creature where
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
+
+-- | Serializes the given list of environments into a jsonfile with the given name.
+-- The json file does not consist of the whole organisms but only their genotypes.
+serialize :: [Environment Creature] -> String -> IO ()
+serialize envs name = do
+  let giantList = map envToLists envs
+  print giantList
+  let directory = "./jsonSysCall/"
+  createDirectoryIfMissing True directory
+  encodeFile (directory ++ name) $ toJSON giantList
+
+genotype' :: Organism a => Life a -> String
+genotype' Nil = ""
+genotype' (Org o) = genotype o
+
+envToLists :: Environment Creature -> [[(String, [Resource])]]
+envToLists env = map (map (Bi.first genotype')) (toLists $ grid env)
 
 -- | Ages the creature by one.
 grow :: Creature -> Creature
@@ -201,7 +223,7 @@ run env gen pos n = do
     then do
       let creature = unsafeGetOrgAt env pos
       let agedCreature = grow creature
-      if hasResources env pos && executable agedCreature
+      if hasResources env pos && Organism.executable agedCreature
         then do
           print n
           print pos
@@ -229,7 +251,10 @@ run env gen pos n = do
               print envAfterInsertion
               rest <- run envAfterInsertion g22 nextPos $ n - 1
               return $ envAfterInsertion : rest
-        else run (insertOrganismAt env agedCreature pos) gen nextPos $ n - 1
+        else do
+          let envAfterGrow = insertOrganismAt env agedCreature pos
+          rest <- run envAfterGrow gen nextPos $ n - 1
+          return $ envAfterGrow : rest
     else run env gen nextPos $ n - 1
 
 -- | The main function.
@@ -241,7 +266,7 @@ mainCreature seed mutationRatio start iterations = do
   print "Init"
   print env
   let first = firstPos
-  run env g2 first (iterations * Environment.getSize env)
-  return ()
+  envList <- run env g2 first (iterations * Environment.getSize env)
+  serialize (env : envList) "justATest"
 
-testCreature = mainCreature 10 0.5 0.5 15
+testCreature = mainCreature 65110 0.5 0.5 15

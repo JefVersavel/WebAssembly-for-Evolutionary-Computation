@@ -7,3 +7,11 @@ src/tests/
 graphics
 *.png
 serialized/
+
+json/
+
+python/.idea/
+
+python/.ipynb_checkpoints/
+
+jsonSysCall/
