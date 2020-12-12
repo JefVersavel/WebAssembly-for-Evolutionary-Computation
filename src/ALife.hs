@@ -11,7 +11,6 @@ import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
 import qualified Data.List as List
 import Data.Matrix
-import Data.Numbers.Primes
 import qualified Data.Text as T
 import Environment
 import ExecuteWasm
@@ -19,8 +18,6 @@ import GHC.Generics
 import Generators
 import GeneticOperations
 import Organism
-import Resource
-import Seeding
 import SysCall
 import System.Directory
 import System.Random
@@ -113,9 +110,9 @@ getRandomRegister gen env pos crea =
 
 -- | Generates an initial population of creatures with and a bound for the initial value of the registers of the creatures and the limits of the environment.
 -- The amount of creatures that need to be generated is equal to at least a tenth of the total cells in the environment.
-generateInitPop :: QCGen -> Double -> Lim -> IO [Creature]
-generateInitPop gen start lim = do
-  let s = uncurry (*) lim `div` 10 + 1
+generateInitPop :: QCGen -> Double -> Lim -> Int -> IO [Creature]
+generateInitPop gen start lim divider = do
+  let s = uncurry (*) lim `div` divider + 1
   let (g1, g2) = split gen
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
@@ -128,10 +125,10 @@ generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> IO (Environment Creature)
-initEnvironment gen n l s = do
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Int -> IO (Environment Creature)
+initEnvironment gen n l s divider = do
   let (g1, g2) = split gen
-  pop <- generateInitPop g1 s l
+  pop <- generateInitPop g1 s l divider
   initializeEnvironment n g2 pop l
 
 -- | Performs sun-tree mutation of the given list of creatures.
@@ -258,15 +255,27 @@ run env gen pos n = do
     else run env gen nextPos $ n - 1
 
 -- | The main function.
-mainCreature :: Seed -> Double -> Double -> Int -> IO ()
-mainCreature seed mutationRatio start iterations = do
+mainCreature :: Seed -> Double -> Int -> Int -> Int -> IO ()
+mainCreature seed start iterations l divider = do
+  let name = "seed= " ++ show seed ++ "_iterations= " ++ show iterations ++ "_limit= " ++ show l ++ "_divider= " ++ show divider
   let (g1, g2) = split $ mkQCGen seed
-  let lim = (5, 5)
-  env <- initEnvironment g1 Moore lim start
+  let lim = (l, l)
+  env <- initEnvironment g1 Moore lim start divider
   print "Init"
   print env
   let first = firstPos
   envList <- run env g2 first (iterations * Environment.getSize env)
-  serialize (env : envList) "justATest"
+  serialize (env : envList) name
 
-testCreature = mainCreature 65110 0.5 0.5 15
+testCreature :: IO ()
+testCreature = do
+  -- mainCreature 1 0.5 50 5 10
+  -- mainCreature 2 0 50 5 10
+  -- mainCreature 3 1 50 5 10
+  -- mainCreature 4 0.5 50 10 10
+  -- mainCreature 5 1000 50 5 10
+  -- mainCreature 6 1 50 5 10
+  -- mainCreature 7 1 50 5 5
+  -- mainCreature 8 1 50 5 2
+  mainCreature 9 1 50 5 20
+  mainCreature 10 1 50 5 10
