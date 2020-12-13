@@ -9,3 +9,11 @@ graphics
 serialized/
 
 json/
+
+jsonSysCall/
+
+python/.idea/inspectionProfiles/
+
+python/.idea/
+
+python/.ipynb_checkpoints/

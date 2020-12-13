@@ -1,7 +1,6 @@
 module Experiments where
 
 import ALife_1
-import SerializeUtils
 
 --
 experiment1 :: IO ()
@@ -28,7 +27,7 @@ experiment7 = mainMVP 16 5 0.5 1 10 100 10
 experiment8 :: IO ()
 experiment8 = mainMVP 17 5 0.5 0.5 10 100 6547
 
-runExperiments :: IO()
+runExperiments :: IO ()
 runExperiments = do
   experiment1
   experiment2
