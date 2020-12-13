@@ -1,5 +1,6 @@
 import json
 import pathlib
+import os
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -17,9 +18,12 @@ for p in pathlib.Path("../jsonSyscall/").iterdir():
 objs = []
 for fpath in flist:
     f = open(fpath)
-    file = f.read()
-    obj = json.loads(file)
-    objs.append(obj)
+    name = str(fpath).split("/")[-1]
+    if name != ".DS_Store":
+        file = f.read()
+        print(name)
+        obj = json.loads(file)
+        objs.append((obj, name))
 
 
 def makeResourceArray(generalArray):
@@ -37,9 +41,7 @@ def makeResourceArray(generalArray):
             if len(org) > 0:
                 org = org[1:]
                 org = org[0:len(org) - 1]
-                print(org)
                 orgList = org.split('_')
-                print(orgList)
                 displayString = orgList[0] + "\n" + orgList[1] + ", " + orgList[2] + ", " + orgList[3]
             orgRow.append(displayString)
             # if len(org) > 0:
@@ -52,8 +54,11 @@ def makeResourceArray(generalArray):
     return orgArray, resArray
 
 
-for obj in objs:
+for (obj, name) in objs:
+    print(name)
     largest = 1
+    dir = "../figssyscall/" + name
+    os.makedirs("../figssyscall/" + name)
     for env in obj:
         _, res = makeResourceArray(env)
         ress = np.flipud(np.array(res))
@@ -68,5 +73,5 @@ for obj in objs:
         fig, ax = plt.subplots()
         ax = sns.heatmap(ress, vmin=0, vmax=largest, annot=orgs, fmt='', cmap='Blues', linewidths=2)
         plt.xlim(0, len(res))
-        plt.ylim([0,len(res[0])])
-        plt.savefig("./" + str(i) + ".png")
+        plt.ylim([0, len(res[0])])
+        plt.savefig(dir + "/" + str(i) + ".png")

@@ -161,15 +161,12 @@ reproduce gen env creature pos = do
     if null nils
       then selectPosition g2 $ getNeighbours env pos
       else selectPosition g2 nils
-  print "test"
-  print n
   if n == 1
     then do
-      print "mutation"
+      print "mutate"
       mutated <- mutateCreature g3 newCreature
       return $ insertOrganismAt env mutated childPos
     else do
-      print "test test"
       return $ insertOrganismAt env newCreature childPos
 
 -- | Performs an action on the environment based on the outcome of the execution of the creature.
@@ -223,17 +220,18 @@ run env gen pos n = do
       if hasResources env pos && Organism.executable agedCreature
         then do
           print n
-          print pos
+          print env
+          -- print pos
           let (g1, g2) = split gen
           let (g21, g22) = split g2
-          print $ expression agedCreature
+          -- print $ expression agedCreature
           resource <- unsafeGetRandomResource env g1 pos
-          print resource
+          -- print resource
           executedCreature <- executeCreature agedCreature resource
           let outcome = register executedCreature
           envAfterAction <- perfromAction g2 env executedCreature pos outcome
           let envWithoutRes = deleteSubResources envAfterAction pos resource
-          print $ "outcome: " ++ show outcome
+          -- print $ "outcome: " ++ show outcome
           distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
           let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
           let total = Environment.getSize envAfterInsertion
@@ -241,11 +239,11 @@ run env gen pos n = do
           if killable total current
             then do
               envAfterKilled <- kill envAfterInsertion $ div current 2
-              print envAfterKilled
+              -- print envAfterKilled
               rest <- run envAfterKilled g22 nextPos $ n - 1
               return $ envAfterKilled : rest
             else do
-              print envAfterInsertion
+              -- print envAfterInsertion
               rest <- run envAfterInsertion g22 nextPos $ n - 1
               return $ envAfterInsertion : rest
         else do
@@ -269,13 +267,15 @@ mainCreature seed start iterations l divider = do
 
 testCreature :: IO ()
 testCreature = do
-  -- mainCreature 1 0.5 50 5 10
-  -- mainCreature 2 0 50 5 10
-  -- mainCreature 3 1 50 5 10
-  -- mainCreature 4 0.5 50 10 10
-  -- mainCreature 5 1000 50 5 10
-  -- mainCreature 6 1 50 5 10
-  -- mainCreature 7 1 50 5 5
-  -- mainCreature 8 1 50 5 2
-  mainCreature 9 1 50 5 20
-  mainCreature 10 1 50 5 10
+  -- mainCreature 1 0.5 11 5 10
+  mainCreature 2 0 11 5 10
+
+-- mainCreature 3 1 50 5 10
+-- mainCreature 4 0.5 50 10 10
+-- mainCreature 5 1000 50 5 10
+-- mainCreature 6 1 50 5 10
+-- mainCreature 7 1 50 5 5
+
+-- mainCreature 8 1 50 5 2
+-- mainCreature 9 1 50 5 20
+-- mainCreature 10 1 50 5 10
