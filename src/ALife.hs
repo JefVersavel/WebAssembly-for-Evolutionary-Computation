@@ -5,7 +5,9 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Data.Aeson
 import qualified Data.ByteString as BS
+import Data.Matrix
 import Data.Numbers.Primes
 import qualified Data.Text as T
 import Environment
@@ -13,6 +15,7 @@ import ExecuteWasm
 import Generators
 import GeneticOperations
 import Organism
+import System.Directory
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -25,21 +28,38 @@ data Creature = Creature
   }
 
 instance Organism Creature where
-  genotype creature = show $ reproducable creature
-
--- firstOp
---   ++ "_"
---   ++ show (size $ expression mvp)
---   ++ "_"
---   ++ show (getMaxDepth $ expression mvp)
--- where
---   firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression mvp
+  genotype creature =
+    show
+      firstOp
+      ++ "_"
+      ++ show (size $ expression creature)
+      ++ "_"
+      ++ show (getMaxDepth $ expression creature)
+    where
+      firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
 
 instance Show Creature where
   show (Creature e _ r) =
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ "\n"
 
 type GenotypePop = [(String, Int)]
+
+-- | Serializes the given list of environments into a jsonfile with the given name.
+-- The json file does not consist of the whole organisms but only their genotypes.
+serialize :: [Environment Creature] -> String -> IO ()
+serialize envs name = do
+  let giantList = map envToLists envs
+  print giantList
+  let directory = "./jsonEnv/"
+  createDirectoryIfMissing True directory
+  encodeFile (directory ++ name) $ toJSON giantList
+
+genotype' :: Organism a => Place a -> String
+genotype' Nil = ""
+genotype' (Org o) = genotype o
+
+envToLists :: Environment Creature -> [[String]]
+envToLists (Env grid _ _) = map (map genotype') (toLists grid)
 
 orgListToExprs :: [[Creature]] -> [[ASTExpression]]
 orgListToExprs = map (map expression)
@@ -170,12 +190,14 @@ mainCreature :: Seed -> Double -> Double -> Int -> IO ()
 mainCreature seed mutationRatio start iterations = do
   let (g1, g2) = split $ mkQCGen seed
   let lim = (5, 5)
+  let name = "seed= " ++ show seed ++ " mutationRatio= " ++ show mutationRatio ++ " start= " ++ show start ++ " iterations= " ++ show iterations
   orgs <- generateInitPop g1 start lim
   let (g11, g22) = split g2
   env <- initializeEnvironment Moore g11 orgs lim
   print "Init"
   print env
-  run env g22 mutationRatio (iterations * 4)
+  final <- run env g22 mutationRatio (iterations * 4)
+  serialize final name
   return ()
 
 testCreature = mainCreature 10 0.5 0.5 10

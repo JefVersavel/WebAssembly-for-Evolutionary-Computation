@@ -18,17 +18,17 @@ data ASTExpression
 instance Serialize ASTExpression
 
 data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize BinaryOperation
 
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize UnaryOperation
 
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
-  deriving (Enum, Eq, Bounded,Generic)
+  deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize RelationalOperation
 
@@ -52,7 +52,7 @@ getSecondASTExpression (RelOp _ _ e) = Just e
 getSecondASTExpression _ = Nothing
 
 smallShow :: ASTExpression -> String
-smallShow (Const c) = "Const " ++ show c
+smallShow (Const c) = "Const " ++ show (round c)
 smallShow (Param d) = "Param" ++ show d
 smallShow (BinOp b _ _) = show b
 smallShow (UnOp u _) = show u

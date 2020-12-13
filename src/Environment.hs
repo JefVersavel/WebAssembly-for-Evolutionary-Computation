@@ -17,12 +17,11 @@ type Pos = (Int, Int)
 
 type Lim = Pos
 
-data Place a = Organism a => Nil | Org a | Res Resource
+data Place a = Organism a => Nil | Org a
 
 instance (Show a, Organism a) => Show (Place a) where
   show Nil = "Nil"
   show (Org org) = genotype org
-  show (Res r) = "Res"
 
 data Environment a = Organism a => Env (Matrix (Place a)) Neighbourhood Lim
 
