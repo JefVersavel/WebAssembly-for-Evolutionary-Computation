@@ -10,6 +10,8 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import Data.List
 --import Data.Numbers.Primes
+
+import Data.Numbers.Primes
 import Data.Serialize
 import qualified Data.Text as T
 import ExecuteWasm
@@ -158,7 +160,7 @@ killFirst orgs ratio = drop n orgs
     n = floor $ ratio * fromIntegral (length orgs)
 
 reproducable :: MVP -> Bool
-reproducable org = mod (round (register org) :: Int) 13 == 0
+reproducable org = isPrime (round $ register org :: Int)
 
 reproduce :: [MVP] -> [MVP]
 reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]

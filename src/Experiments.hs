@@ -31,9 +31,10 @@ runExperiments :: IO ()
 runExperiments = do
   experiment1
   experiment2
-  experiment3
-  experiment4
-  experiment5
-  experiment6
-  experiment7
-  experiment8
+
+-- experiment3
+-- experiment4
+-- experiment5
+-- experiment6
+-- experiment7
+-- experiment8
