@@ -15,3 +15,5 @@ python/.idea/
 python/.ipynb_checkpoints/
 
 jsonSysCall/
+
+.idea/
