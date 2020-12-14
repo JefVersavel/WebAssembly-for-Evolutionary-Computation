@@ -7,9 +7,10 @@ module ALife where
 import AST
 import qualified ASTRepresentation as Rep
 import Data.Aeson
+import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
 import qualified Data.List as List
-import Data.Numbers.Primes
+import Data.Matrix
 import qualified Data.Text as T
 import Environment
 import ExecuteWasm
@@ -17,9 +18,8 @@ import GHC.Generics
 import Generators
 import GeneticOperations
 import Organism
-import Resource
-import Seeding
 import SysCall
+import System.Directory
 import System.Random
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Random
@@ -34,7 +34,7 @@ data Creature = Creature
   }
   deriving (Eq, Generic)
 
-data SmallCreature = SmallCreature ASTExpression Double
+data SmallCreature = SmallCreature ASTExpression Double Int
   deriving (Eq, Generic)
 
 instance ToJSON SmallCreature
@@ -47,6 +47,8 @@ instance Organism Creature where
         ++ show (size $ expression creature)
         ++ "_"
         ++ show (getMaxDepth $ expression creature)
+        ++ "_"
+        ++ show (age creature)
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
   executable creature = age creature > 1
@@ -56,6 +58,23 @@ instance Show Creature where
     show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
 
 type GenotypePop = [(String, Int)]
+
+-- | Serializes the given list of environments into a jsonfile with the given name.
+-- The json file does not consist of the whole organisms but only their genotypes.
+serialize :: [Environment Creature] -> String -> IO ()
+serialize envs name = do
+  let giantList = map envToLists envs
+  print giantList
+  let directory = "./jsonSysCall/"
+  createDirectoryIfMissing True directory
+  encodeFile (directory ++ name) $ toJSON giantList
+
+genotype' :: Organism a => Life a -> String
+genotype' Nil = ""
+genotype' (Org o) = genotype o
+
+envToLists :: Environment Creature -> [[(String, [Resource])]]
+envToLists env = map (map (Bi.first genotype')) (toLists $ grid env)
 
 -- | Ages the creature by one.
 grow :: Creature -> Creature
@@ -91,9 +110,9 @@ getRandomRegister gen env pos crea =
 
 -- | Generates an initial population of creatures with and a bound for the initial value of the registers of the creatures and the limits of the environment.
 -- The amount of creatures that need to be generated is equal to at least a tenth of the total cells in the environment.
-generateInitPop :: QCGen -> Double -> Lim -> IO [Creature]
-generateInitPop gen start lim = do
-  let s = uncurry (*) lim `div` 10 + 1
+generateInitPop :: QCGen -> Double -> Lim -> Int -> IO [Creature]
+generateInitPop gen start lim divider = do
+  let s = uncurry (*) lim `div` divider + 1
   let (g1, g2) = split gen
   ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
   let starts = generateStart g2 s start
@@ -106,10 +125,10 @@ generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> IO (Environment Creature)
-initEnvironment gen n l s = do
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Int -> IO (Environment Creature)
+initEnvironment gen n l s divider = do
   let (g1, g2) = split gen
-  pop <- generateInitPop g1 s l
+  pop <- generateInitPop g1 s l divider
   initializeEnvironment n g2 pop l
 
 -- | Performs sun-tree mutation of the given list of creatures.
@@ -142,15 +161,12 @@ reproduce gen env creature pos = do
     if null nils
       then selectPosition g2 $ getNeighbours env pos
       else selectPosition g2 nils
-  print "test"
-  print n
   if n == 1
     then do
-      print "mutation"
+      print "mutate"
       mutated <- mutateCreature g3 newCreature
       return $ insertOrganismAt env mutated childPos
     else do
-      print "test test"
       return $ insertOrganismAt env newCreature childPos
 
 -- | Performs an action on the environment based on the outcome of the execution of the creature.
@@ -201,20 +217,21 @@ run env gen pos n = do
     then do
       let creature = unsafeGetOrgAt env pos
       let agedCreature = grow creature
-      if hasResources env pos && executable agedCreature
+      if hasResources env pos && Organism.executable agedCreature
         then do
           print n
-          print pos
+          print env
+          -- print pos
           let (g1, g2) = split gen
           let (g21, g22) = split g2
-          print $ expression agedCreature
+          -- print $ expression agedCreature
           resource <- unsafeGetRandomResource env g1 pos
-          print resource
+          -- print resource
           executedCreature <- executeCreature agedCreature resource
           let outcome = register executedCreature
           envAfterAction <- perfromAction g2 env executedCreature pos outcome
           let envWithoutRes = deleteSubResources envAfterAction pos resource
-          print $ "outcome: " ++ show outcome
+          -- print $ "outcome: " ++ show outcome
           distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
           let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
           let total = Environment.getSize envAfterInsertion
@@ -222,26 +239,43 @@ run env gen pos n = do
           if killable total current
             then do
               envAfterKilled <- kill envAfterInsertion $ div current 2
-              print envAfterKilled
+              -- print envAfterKilled
               rest <- run envAfterKilled g22 nextPos $ n - 1
               return $ envAfterKilled : rest
             else do
-              print envAfterInsertion
+              -- print envAfterInsertion
               rest <- run envAfterInsertion g22 nextPos $ n - 1
               return $ envAfterInsertion : rest
-        else run (insertOrganismAt env agedCreature pos) gen nextPos $ n - 1
+        else do
+          let envAfterGrow = insertOrganismAt env agedCreature pos
+          rest <- run envAfterGrow gen nextPos $ n - 1
+          return $ envAfterGrow : rest
     else run env gen nextPos $ n - 1
 
 -- | The main function.
-mainCreature :: Seed -> Double -> Double -> Int -> IO ()
-mainCreature seed mutationRatio start iterations = do
+mainCreature :: Seed -> Double -> Int -> Int -> Int -> IO ()
+mainCreature seed start iterations l divider = do
+  let name = "seed= " ++ show seed ++ "_iterations= " ++ show iterations ++ "_limit= " ++ show l ++ "_divider= " ++ show divider
   let (g1, g2) = split $ mkQCGen seed
-  let lim = (5, 5)
-  env <- initEnvironment g1 Moore lim start
+  let lim = (l, l)
+  env <- initEnvironment g1 Moore lim start divider
   print "Init"
   print env
   let first = firstPos
-  run env g2 first (iterations * Environment.getSize env)
-  return ()
+  envList <- run env g2 first (iterations * Environment.getSize env)
+  serialize (env : envList) name
 
-testCreature = mainCreature 10 0.5 0.5 15
+testCreature :: IO ()
+testCreature = do
+  -- mainCreature 1 0.5 11 5 10
+  mainCreature 2 0 11 5 10
+
+-- mainCreature 3 1 50 5 10
+-- mainCreature 4 0.5 50 10 10
+-- mainCreature 5 1000 50 5 10
+-- mainCreature 6 1 50 5 10
+-- mainCreature 7 1 50 5 5
+
+-- mainCreature 8 1 50 5 2
+-- mainCreature 9 1 50 5 20
+-- mainCreature 10 1 50 5 10
