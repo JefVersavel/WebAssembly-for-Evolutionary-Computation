@@ -72,6 +72,7 @@ for (obj, name) in objs:
         sns.set()
         fig, ax = plt.subplots()
         ax = sns.heatmap(ress, vmin=0, vmax=largest, annot=orgs, fmt='', cmap='Blues', linewidths=2)
+        plt.title("Iteration " + str(i))
         plt.xlim(0, len(res))
         plt.ylim([0, len(res[0])])
         plt.savefig(dir + "/" + str(i) + ".png")
