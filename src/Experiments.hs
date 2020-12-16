@@ -30,7 +30,6 @@ experiment8 = mainMVP 17 5 0.5 0.5 10 100 6547
 runExperiments :: IO ()
 runExperiments = do
   experiment1
-  experiment2
 
 -- experiment3
 -- experiment4

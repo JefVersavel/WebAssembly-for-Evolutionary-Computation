@@ -160,7 +160,7 @@ killFirst orgs ratio = drop n orgs
     n = floor $ ratio * fromIntegral (length orgs)
 
 reproducable :: MVP -> Bool
-reproducable org = isPrime (round $ register org :: Int)
+reproducable org = mod (round $ register org :: Int) 13 == 0
 
 reproduce :: [MVP] -> [MVP]
 reproduce orgs = orgs ++ [org | org <- orgs, reproducable org]
