@@ -26,32 +26,21 @@ for fpath in flist:
         objs.append((obj, name))
 
 
-def makeResourceArray(generalArray):
-    resArray = []
+def refactorArray(generalArray):
     orgArray = []
 
     for row in generalArray:
         orgRow = []
-        resRos = []
-        for item in row:
-            org = item[0]
-            res = item[1]
-            resRos.append(len(res))
+        for org in row:
             displayString = ""
             if len(org) > 0:
-                org = org[1:]
-                org = org[0:len(org) - 1]
                 orgList = org.split('_')
-                displayString = orgList[0] + "\n" + orgList[1] + ", " + orgList[2] + ", " + orgList[3]
+                print(orgList)
+                displayString = orgList[0][1:len(orgList[0] )- 1] + "\n" + orgList[1] + ", " + orgList[2]
             orgRow.append(displayString)
-            # if len(org) > 0:
-            #     orgRow.append('x')
-            # else:
-            #     orgRow.append('')
-        resArray.append(resRos)
         orgArray.append(orgRow)
 
-    return orgArray, resArray
+    return orgArray
 
 
 for (obj, name) in objs:
@@ -63,11 +52,13 @@ for (obj, name) in objs:
         # orgs = np.flipud(np.array(org))
         # ress = np.flipud(np.array(res))
         env = obj[i]
+        env = refactorArray(env)
         ones = np.ones((len(env), len(env[0])))
         env = np.flipud(env)
         sns.set()
         fig, ax = plt.subplots()
         ax = sns.heatmap(ones, vmin=0, vmax=largest, annot=env, fmt='', cbar=False, cmap='Blues', linewidths=2)
+        plt.title("Iteration " + str(i))
         plt.xlim(0, len(ones))
         plt.ylim([0, len(ones[0])])
         plt.savefig(dir + "/" + str(i) + ".png")

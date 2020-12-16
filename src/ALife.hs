@@ -200,4 +200,4 @@ mainCreature seed mutationRatio start iterations = do
   serialize final name
   return ()
 
-testCreature = mainCreature 10 0.5 0.5 10
+testCreature = mainCreature 10 0.5 0.5 30
