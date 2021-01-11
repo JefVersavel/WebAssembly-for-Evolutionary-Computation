@@ -34,7 +34,8 @@ data Environment a = Organism a =>
   Env
   { grid :: Matrix (Cell a),
     neighbourhood :: Neighbourhood,
-    limits :: Lim
+    limits :: Lim,
+    low :: Int
   }
 
 instance (Show a, Organism a) => Show (Environment a) where
@@ -142,9 +143,9 @@ diagonalPos (x, y) = [(x -1, y -1), (x + 1, y + 1), (x + 1, y -1), (x -1, y + 1)
 -- | Returns the neighbours of a position in an environment.
 -- This takes into account the environments neighbourhood.
 getNeighbours :: Organism a => Environment a -> Pos -> [Pos]
-getNeighbours (Env _ Moore lim) p =
+getNeighbours (Env _ Moore lim _) p =
   [neighbour | neighbour <- adjacentPos p ++ diagonalPos p, legalPos neighbour lim]
-getNeighbours (Env _ VonNeumann lim) p =
+getNeighbours (Env _ VonNeumann lim _) p =
   [neighbour | neighbour <- adjacentPos p, legalPos neighbour lim]
 
 -- | Returns the cell for the given position if the given position is legal.
@@ -197,7 +198,7 @@ unsafeGetRandomResource env gen pos = QC.generate $ useSeed gen $ QC.elements $ 
 -- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
 insertResourcesAt env res p
-  | legalPos p lim = Env (unsafeSet (fst cell, res) p grd) hood lim
+  | legalPos p lim = Env (unsafeSet (fst cell, res) p grd) hood lim (low env)
   | otherwise = error "given position is not inbounds"
   where
     cell = fromJust $ getCellAt env p
@@ -314,7 +315,7 @@ getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 -- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt env org p
-  | legalPos p lim = Env (unsafeSet (Org org, resources) p grd) hood lim
+  | legalPos p lim = Env (unsafeSet (Org org, resources) p grd) hood lim (low env)
   | otherwise = error "given position is not inbounds"
   where
     resources = fromJust $ getResourcesAt env p
@@ -324,7 +325,7 @@ insertOrganismAt env org p
 
 -- | Returns a list of all the organims in the environment.
 getAllOrgs :: Organism a => Environment a -> [a]
-getAllOrgs (Env m _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
+getAllOrgs (Env m _ _ _) = map (fromJust . getOrg) $ filter isOrg $ toList m
 
 -- | Returns a list of tuples with all all the organisms in the environment with its accompanying position.
 getOrgsPos :: Organism a => Environment a -> [(Pos, a)]
@@ -337,7 +338,7 @@ getPermutedOrgsPos gen env = QC.generate $ useSeed gen $ QC.shuffle $ getOrgsPos
 -- | Deletes organism at the given position.
 deleteOrganismAt :: Organism a => Environment a -> Pos -> Environment a
 deleteOrganismAt env p
-  | legalPos p lim = Env (unsafeSet (Nil, resources) p grd) hood lim
+  | legalPos p lim = Env (unsafeSet (Nil, resources) p grd) hood lim (low env)
   | otherwise = error "given position is not inbounds"
   where
     resources = fromJust $ getResourcesAt env p
@@ -357,7 +358,7 @@ fillInOrgs env ((pos, org) : rst) = insertOrganismAt env' org pos
 -- with the given limits and neighbourhood.
 empty :: Organism a => Lim -> Neighbourhood -> Environment a
 empty (mx, my) n
-  | legalLimits (mx, my) = Env (matrix mx my nilGenerator) n (mx, my)
+  | legalLimits (mx, my) = Env (matrix mx my nilGenerator) n (mx, my) 1
   | otherwise = error "the given limits must be positive and nonzero"
 
 -- | Distributes the given list of items, could be organisms or resources,
