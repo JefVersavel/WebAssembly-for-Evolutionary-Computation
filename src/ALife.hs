@@ -6,6 +6,7 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Control.Monad.State
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
@@ -18,6 +19,7 @@ import GHC.Generics
 import Generators
 import GeneticOperations
 import Organism
+import Running
 import SysCall
 import System.Directory
 import System.Random
@@ -206,12 +208,12 @@ killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
 -- Secondly the creatures in the environment are executed and their register is updated.
 -- Thirdly the environment is mutated.
 -- Lastly the reproducable creatures are reproduced in the environment.
-run :: Environment Creature -> QCGen -> Pos -> Int -> IO [Environment Creature]
-run env _ _ 0 = do
+run' :: Environment Creature -> QCGen -> Pos -> Int -> IO [Environment Creature]
+run' env _ _ 0 = do
   print "End"
   print env
   return [env]
-run env gen pos n = do
+run' env gen pos n = do
   let nextPos = Environment.next env pos
   if hasOrg env pos
     then do
@@ -240,17 +242,41 @@ run env gen pos n = do
             then do
               envAfterKilled <- kill envAfterInsertion $ div current 2
               -- print envAfterKilled
-              rest <- run envAfterKilled g22 nextPos $ n - 1
+              rest <- run' envAfterKilled g22 nextPos $ n - 1
               return $ envAfterKilled : rest
             else do
               -- print envAfterInsertion
-              rest <- run envAfterInsertion g22 nextPos $ n - 1
+              rest <- run' envAfterInsertion g22 nextPos $ n - 1
               return $ envAfterInsertion : rest
         else do
           let envAfterGrow = insertOrganismAt env agedCreature pos
-          rest <- run envAfterGrow gen nextPos $ n - 1
+          rest <- run' envAfterGrow gen nextPos $ n - 1
           return $ envAfterGrow : rest
-    else run env gen nextPos $ n - 1
+    else run' env gen nextPos $ n - 1
+
+run :: Environment Creature -> State (RunState Creature) (IO (Environment Creature))
+run env = do
+  RunState iteration runningQueue gen <- get
+  if iteration == 0
+    then return $ pure env
+    else do
+      let (Runnable org pos action storage) = head runningQueue
+      let rest = tail runningQueue
+      return $ pure env
+
+-- | Inserts a new organism in the running queue
+insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
+insertNewOrg runnables new pos = runnables ++ [Runnable new pos ResourceAquirement Empty]
+
+-- | Prepares the initial state for a simulation.
+makeState :: Environment Creature -> Int -> QCGen -> RunState Creature
+makeState env iterations =
+  RunState
+    iterations
+    ( map
+        (\(pos, org) -> Runnable org pos ResourceAquirement Empty)
+        (List.sortOn (\(_, org :: Creature) -> age org) $ getOrgsPos env)
+    )
 
 -- | The main function.
 mainCreature :: Seed -> Double -> Int -> Int -> Int -> IO ()
@@ -262,7 +288,7 @@ mainCreature seed start iterations l divider = do
   print "Init"
   print env
   let first = firstPos
-  envList <- run env g2 first (iterations * Environment.getSize env)
+  envList <- run' env g2 first (iterations * Environment.getSize env)
   serialize (env : envList) name
 
 testCreature :: IO ()
