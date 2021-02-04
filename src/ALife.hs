@@ -153,7 +153,7 @@ mutationChance = 4
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
 -- It also is poxxible by chance that the reproduced creature is mutated.
-reproduce :: QCGen -> Environment Creature -> Creature -> Pos -> IO (Environment Creature)
+reproduce :: QCGen -> Environment Creature -> Creature -> Pos -> IO ([Runnable Creature], Environment Creature)
 reproduce gen env creature pos = do
   let nils = getNilNeighbours env pos
   let newCreature = reborn creature
@@ -167,15 +167,21 @@ reproduce gen env creature pos = do
     then do
       print "mutate"
       mutated <- mutateCreature g3 newCreature
-      return $ insertOrganismAt env mutated childPos
+      return ([], insertOrganismAt env mutated childPos)
     else do
-      return $ insertOrganismAt env newCreature childPos
+      return ([Runnable newCreature childPos ResourceAquirement Empty], insertOrganismAt env newCreature childPos)
 
 -- | Performs an action on the environment based on the outcome of the execution of the creature.
-perfromAction :: QCGen -> Environment Creature -> Creature -> Pos -> Double -> IO (Environment Creature)
-perfromAction gen env creature pos outcome = case toSysCall outcome of
+executeAction ::
+  QCGen ->
+  Environment Creature ->
+  Creature ->
+  Pos ->
+  Double ->
+  IO ([Runnable Creature], Environment Creature)
+executeAction gen env creature pos outcome = case toSysCall outcome of
   Reproduction -> print "reproducing" >> reproduce gen env creature pos
-  None -> return env
+  None -> return ([], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
 getAgePos :: Environment Creature -> [(Int, Gen Pos)]
@@ -231,7 +237,7 @@ run' env gen pos n = do
           -- print resource
           executedCreature <- executeCreature agedCreature resource
           let outcome = register executedCreature
-          envAfterAction <- perfromAction g2 env executedCreature pos outcome
+          (_, envAfterAction) <- executeAction g2 env executedCreature pos outcome
           let envWithoutRes = deleteSubResources envAfterAction pos resource
           -- print $ "outcome: " ++ show outcome
           distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
@@ -254,15 +260,46 @@ run' env gen pos n = do
           return $ envAfterGrow : rest
     else run' env gen nextPos $ n - 1
 
-run :: Environment Creature -> State (RunState Creature) (IO (Environment Creature))
-run env = do
-  RunState iteration runningQueue gen <- get
+run :: Environment Creature -> RunState Creature -> IO (Environment Creature)
+run env (RunState iteration runningQueue gen) = do
   if iteration == 0
-    then return $ pure env
+    then return env
     else do
-      let (Runnable org pos action storage) = head runningQueue
+      let (leftGen, rightGen) = split gen
+      let currentRunnable = head runningQueue
       let rest = tail runningQueue
-      return $ pure env
+      (runnables, newEnv) <- performAction leftGen env currentRunnable
+      let newRunnables = rest ++ runnables
+      let total = Environment.getSize newEnv
+      -- kill if there are too many organisms
+      let current = length newRunnables
+      let newState = RunState (iteration - 1) (rest ++ runnables) rightGen
+      run newEnv newState
+
+performAction ::
+  QCGen ->
+  Environment Creature ->
+  Runnable Creature ->
+  IO ([Runnable Creature], Environment Creature)
+performAction gen env (Runnable org pos ResourceAquirement res) =
+  if hasResources env pos
+    then do
+      newRes <- unsafeGetRandomResource env gen pos
+      return
+        ([Runnable org pos (nextAction ResourceAquirement) (Res newRes)], env)
+    else return ([Runnable org pos ResourceAquirement res], env)
+performAction _ env (Runnable org pos Execution Empty) =
+  return ([Runnable org pos ResourceAquirement Empty], env)
+performAction gen env (Runnable org pos Execution (Res res)) = do
+  executedCreature <- executeCreature org res
+  let outcome = register executedCreature
+  let newCreature = grow executedCreature
+  let deletedEnv = deleteSubResources env pos res
+  addedEnv <- addResourceToNeighbours gen deletedEnv pos outcome
+  return ([Runnable newCreature pos SystemCall Empty], addedEnv)
+performAction gen env (Runnable org pos SystemCall _) = do
+  (runnable, envAfterSyscall) <- executeAction gen env org pos $ register org
+  return (Runnable org pos ResourceAquirement Empty : runnable, envAfterSyscall)
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -293,15 +330,4 @@ mainCreature seed start iterations l divider = do
 
 testCreature :: IO ()
 testCreature = do
-  -- mainCreature 1 0.5 11 5 10
   mainCreature 2 0 11 5 10
-
--- mainCreature 3 1 50 5 10
--- mainCreature 4 0.5 50 10 10
--- mainCreature 5 1000 50 5 10
--- mainCreature 6 1 50 5 10
--- mainCreature 7 1 50 5 5
-
--- mainCreature 8 1 50 5 2
--- mainCreature 9 1 50 5 20
--- mainCreature 10 1 50 5 10

@@ -7,7 +7,7 @@ import Organism
 import Test.QuickCheck.Random
 
 -- | Data type for the different actions that an organism can or has to do.
-data Action = ResourceAquirement | Execution | Reproduce | ResourceDistribution
+data Action = ResourceAquirement | Execution | SystemCall
 
 data Storage = Res Resource | Empty
 
@@ -41,14 +41,11 @@ emptyStorage :: Runnable a -> Runnable a
 emptyStorage (Runnable org pos act _) = Runnable org pos act Empty
 
 -- | Returns the next action based on a boolean.
-nextAction :: Action -> Bool -> Action
-nextAction ResourceAquirement permission
-  | permission = Execution
-  | otherwise = ResourceAquirement
-nextAction Execution _ = Reproduce
-nextAction Reproduce _ = ResourceDistribution
-nextAction ResourceDistribution _ = ResourceAquirement
+nextAction :: Action -> Action
+nextAction ResourceAquirement = Execution
+nextAction Execution = SystemCall
+nextAction SystemCall = ResourceAquirement
 
 -- | Advances the action of the runnable to the next action.
-next :: Runnable a -> Bool -> Runnable a
-next runnable permission = setAction runnable $ nextAction (action runnable) permission
+next :: Runnable a -> Runnable a
+next runnable = setAction runnable $ nextAction (action runnable)
