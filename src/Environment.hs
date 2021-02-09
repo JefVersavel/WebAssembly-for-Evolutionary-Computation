@@ -253,8 +253,8 @@ addResourceToNeighbours gen env pos d = do
   neighbour <- QC.generate $ useSeed gen $ QC.elements $ getNeighbours env pos
   let res = getResourcesAt env neighbour
   case res of
-    Nothing -> return $ insertResourcesAt env [d] pos
-    Just r -> return $ insertResourcesAt env (d : r) pos
+    Nothing -> return $ insertResourcesAt env [d] neighbour
+    Just r -> return $ insertResourcesAt env (d : r) neighbour
 
 -- | Returns True if the given cell contains an organism.
 isOrg :: Organism a => Cell a -> Bool

@@ -8,8 +8,10 @@ import Test.QuickCheck.Random
 
 -- | Data type for the different actions that an organism can or has to do.
 data Action = ResourceAquirement | Execution | SystemCall
+  deriving (Show)
 
 data Storage = Res Resource | Empty
+  deriving (Show)
 
 -- | Representation of an organims that is currently part of the running queue
 data Runnable a = Organism a =>
@@ -19,6 +21,9 @@ data Runnable a = Organism a =>
     action :: Action,
     resource :: Storage
   }
+
+instance Show (Runnable a) where
+  show (Runnable org pos act stor) = genotype org ++ " " ++ show pos ++ " " ++ show act ++ " " ++ show stor ++ "\n"
 
 -- | Represents that state that is kept during the running of a simulation
 data RunState a = Organism a => RunState Int [Runnable a] QCGen

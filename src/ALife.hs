@@ -6,7 +6,6 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
-import Control.Monad.State
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
@@ -66,7 +65,6 @@ type GenotypePop = [(String, Int)]
 serialize :: [Environment Creature] -> String -> IO ()
 serialize envs name = do
   let giantList = map envToLists envs
-  print giantList
   let directory = "./jsonSysCall/"
   createDirectoryIfMissing True directory
   encodeFile (directory ++ name) $ toJSON giantList
@@ -181,7 +179,7 @@ executeAction ::
   IO ([Runnable Creature], Environment Creature)
 executeAction gen env creature pos outcome = case toSysCall outcome of
   Reproduction -> print "reproducing" >> reproduce gen env creature pos
-  None -> return ([], env)
+  None -> print "do nothing" >> return ([], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
 getAgePos :: Environment Creature -> [(Int, Gen Pos)]
@@ -198,8 +196,14 @@ generateInfiniteKillList env = do
 kill :: Environment Creature -> Int -> IO (Environment Creature)
 kill env amount = do
   positions <- generateInfiniteKillList env
-  let killPositions = take amount $ List.nub positions
-  return $ nillify env killPositions
+  let killPos = take amount $ List.nub positions
+  return $ nillify env killPos
+
+-- | Returns a given number of positions in the envirionment on which the organims can be killed
+killPositions :: Environment Creature -> Int -> IO [Pos]
+killPositions env amount = do
+  positions <- generateInfiniteKillList env
+  return $ take amount $ List.nub positions
 
 -- | returns true if for the given total and current amount of organisms in the evironment, there is overpopulation.
 killable :: Int -> Int -> Bool
@@ -233,12 +237,12 @@ run' env gen pos n = do
           let (g1, g2) = split gen
           let (g21, g22) = split g2
           -- print $ expression agedCreature
-          resource <- unsafeGetRandomResource env g1 pos
+          res <- unsafeGetRandomResource env g1 pos
           -- print resource
-          executedCreature <- executeCreature agedCreature resource
+          executedCreature <- executeCreature agedCreature res
           let outcome = register executedCreature
           (_, envAfterAction) <- executeAction g2 env executedCreature pos outcome
-          let envWithoutRes = deleteSubResources envAfterAction pos resource
+          let envWithoutRes = deleteSubResources envAfterAction pos res
           -- print $ "outcome: " ++ show outcome
           distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
           let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
@@ -260,44 +264,72 @@ run' env gen pos n = do
           return $ envAfterGrow : rest
     else run' env gen nextPos $ n - 1
 
-run :: Environment Creature -> RunState Creature -> IO (Environment Creature)
+run :: Environment Creature -> RunState Creature -> IO [Environment Creature]
 run env (RunState iteration runningQueue gen) = do
+  print ""
+  print iteration
+  print runningQueue
   if iteration == 0
-    then return env
+    then return [env]
     else do
       let (leftGen, rightGen) = split gen
       let currentRunnable = head runningQueue
+      print "organism:"
+      print $ organism currentRunnable
       let rest = tail runningQueue
       (runnables, newEnv) <- performAction leftGen env currentRunnable
       let newRunnables = rest ++ runnables
       let total = Environment.getSize newEnv
-      -- kill if there are too many organisms
       let current = length newRunnables
-      let newState = RunState (iteration - 1) (rest ++ runnables) rightGen
-      run newEnv newState
+      let newIteration = iteration - 1
+      if killable total current
+        then do
+          print "killing things"
+          kills <- killPositions newEnv $ div current 2
+          let runnablesAfterKilled = filter (\(Runnable _ pos _ _) -> pos `notElem` kills) newRunnables
+          let newState = RunState newIteration runnablesAfterKilled rightGen
+          let envAfterKilled = nillify newEnv kills
+          print envAfterKilled
+          restRun <- run envAfterKilled newState
+          return $ env : restRun
+        else do
+          print "not killing things"
+          let newState = RunState newIteration newRunnables rightGen
+          print newEnv
+          restRun <- run newEnv newState
+          return $ env : restRun
 
 performAction ::
   QCGen ->
   Environment Creature ->
   Runnable Creature ->
   IO ([Runnable Creature], Environment Creature)
-performAction gen env (Runnable org pos ResourceAquirement res) =
+performAction gen env (Runnable org pos ResourceAquirement res) = do
+  print "trying to aquire resources"
   if hasResources env pos
     then do
       newRes <- unsafeGetRandomResource env gen pos
+      print "resource:"
+      print newRes
+      let deletedEnv = deleteSubResources env pos newRes
       return
-        ([Runnable org pos (nextAction ResourceAquirement) (Res newRes)], env)
-    else return ([Runnable org pos ResourceAquirement res], env)
-performAction _ env (Runnable org pos Execution Empty) =
+        ([Runnable org pos (nextAction ResourceAquirement) (Res newRes)], deletedEnv)
+    else do
+      print "no resource found"
+      return ([Runnable org pos ResourceAquirement res], env)
+performAction _ env (Runnable org pos Execution Empty) = do
+  print "execution without resources is not possible"
   return ([Runnable org pos ResourceAquirement Empty], env)
 performAction gen env (Runnable org pos Execution (Res res)) = do
+  print "execution"
+  print $ expression org
   executedCreature <- executeCreature org res
   let outcome = register executedCreature
   let newCreature = grow executedCreature
-  let deletedEnv = deleteSubResources env pos res
-  addedEnv <- addResourceToNeighbours gen deletedEnv pos outcome
+  addedEnv <- addResourceToNeighbours gen env pos outcome
   return ([Runnable newCreature pos SystemCall Empty], addedEnv)
 performAction gen env (Runnable org pos SystemCall _) = do
+  print "doing a system call"
   (runnable, envAfterSyscall) <- executeAction gen env org pos $ register org
   return (Runnable org pos ResourceAquirement Empty : runnable, envAfterSyscall)
 
@@ -324,10 +356,10 @@ mainCreature seed start iterations l divider = do
   env <- initEnvironment g1 Moore lim start divider
   print "Init"
   print env
-  let first = firstPos
-  envList <- run' env g2 first (iterations * Environment.getSize env)
+  let firstState = makeState env iterations g2
+  envList <- run env firstState
   serialize (env : envList) name
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 2 0 11 5 10
+  mainCreature 2 0 1000 5 10
