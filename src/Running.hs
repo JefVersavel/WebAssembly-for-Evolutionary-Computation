@@ -23,7 +23,15 @@ data Runnable a = Organism a =>
   }
 
 instance Show (Runnable a) where
-  show (Runnable org pos act stor) = genotype org ++ " " ++ show pos ++ " " ++ show act ++ " " ++ show stor ++ "\n"
+  show (Runnable org pos act stor) =
+    genotype org
+      ++ " "
+      ++ show pos
+      ++ " "
+      ++ show act
+      ++ " "
+      ++ show stor
+      ++ "\n"
 
 -- | Represents that state that is kept during the running of a simulation
 data RunState a = Organism a => RunState Int [Runnable a] QCGen

@@ -118,7 +118,7 @@ next env pos
   where
     add
       | y < ylim = (x, y + 1)
-      | y == ylim = (x + 1, 1)
+      | otherwise = (x + 1, 1)
     x = getX pos
     y = getY pos
     ylim = getYLim env
@@ -161,22 +161,20 @@ getOrg (Org o, _) = Just o
 getOrg _ = Nothing
 
 -- | Returns the resources in a given cell.
-getResources :: Cell a -> Maybe [Resource]
-getResources (_, r) = Just r
-getResources _ = Nothing
+getResources :: Cell a -> [Resource]
+getResources (_, r) = r
 
 -- | Returns True if the given cell has a non-zero amount of resources.
 containsResources :: Cell a -> Bool
 containsResources (_, r)
   | List.null r = False
   | otherwise = True
-containsResources _ = False
 
 -- | Returns the resources at a given position.
 getResourcesAt :: Environment a -> Pos -> Maybe [Resource]
 getResourcesAt env pos = do
   cell <- getCellAt env pos
-  getResources cell
+  return $ getResources cell
 
 -- | Returns true if the postion in the enbironment contains resources
 -- otherwise returns false.
@@ -315,10 +313,10 @@ getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 -- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt env org p
-  | legalPos p lim = Env (unsafeSet (Org org, resources) p grd) hood lim (low env)
+  | legalPos p lim = Env (unsafeSet (Org org, res) p grd) hood lim (low env)
   | otherwise = error "given position is not inbounds"
   where
-    resources = fromJust $ getResourcesAt env p
+    res = fromJust $ getResourcesAt env p
     grd = grid env
     lim = limits env
     hood = neighbourhood env

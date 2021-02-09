@@ -2,7 +2,13 @@ module SysCall where
 
 -- | Represents the call that an organism can make to the host.
 -- The calls are then performed by the host.
-data SysCall = None | Reproduction
+data SysCall
+  = None
+  | Reproduction
+  | Up
+  | Down
+  | Right
+  | Left
   deriving (Bounded, Enum, Show, Eq, Ord)
 
 -- | Returns the syscall that is associated with the given outcome of the orgamism

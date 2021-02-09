@@ -17,6 +17,7 @@ import ExecuteWasm
 import GHC.Generics
 import Generators
 import GeneticOperations
+import Movement
 import Organism
 import Running
 import SysCall
@@ -165,7 +166,7 @@ reproduce gen env creature pos = do
     then do
       print "mutate"
       mutated <- mutateCreature g3 newCreature
-      return ([], insertOrganismAt env mutated childPos)
+      return ([Runnable mutated childPos ResourceAquirement Empty], insertOrganismAt env mutated childPos)
     else do
       return ([Runnable newCreature childPos ResourceAquirement Empty], insertOrganismAt env newCreature childPos)
 
@@ -173,13 +174,39 @@ reproduce gen env creature pos = do
 executeAction ::
   QCGen ->
   Environment Creature ->
-  Creature ->
-  Pos ->
+  Runnable Creature ->
   Double ->
   IO ([Runnable Creature], Environment Creature)
-executeAction gen env creature pos outcome = case toSysCall outcome of
-  Reproduction -> print "reproducing" >> reproduce gen env creature pos
-  None -> print "do nothing" >> return ([], env)
+executeAction gen env runnable outcome = do
+  let creature = organism runnable
+  let pos = position runnable
+  let act = action runnable
+  let res = resource runnable
+  case toSysCall outcome of
+    Reproduction -> do
+      print "reproducing"
+      reproduce gen env creature pos
+    Up -> do
+      print "moving up"
+      let (newPos, newEnv) = moveOrg env pos U
+      print newPos
+      return ([Runnable creature newPos act res], newEnv)
+    Down -> do
+      print "moving down"
+      let (newPos, newEnv) = moveOrg env pos D
+      print newPos
+      return ([Runnable creature newPos act res], newEnv)
+    SysCall.Right -> do
+      print "moving right"
+      let (newPos, newEnv) = moveOrg env pos R
+      print newPos
+      return ([Runnable creature newPos act res], newEnv)
+    SysCall.Left -> do
+      print "moving left"
+      let (newPos, newEnv) = moveOrg env pos L
+      print newPos
+      return ([Runnable creature newPos act res], newEnv)
+    None -> print "do nothing" >> return ([runnable], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
 getAgePos :: Environment Creature -> [(Int, Gen Pos)]
@@ -212,57 +239,6 @@ killable total amount = ((fromIntegral amount :: Double) / fromIntegral total) >
 -- | Kills returns if their is overpopulation in the environment.
 killableEnv :: Environment Creature -> Bool
 killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
-
--- | Performs a run.
--- First the Reaper is invoked and randomly kills creature if the environment is more than 80% full.
--- Secondly the creatures in the environment are executed and their register is updated.
--- Thirdly the environment is mutated.
--- Lastly the reproducable creatures are reproduced in the environment.
-run' :: Environment Creature -> QCGen -> Pos -> Int -> IO [Environment Creature]
-run' env _ _ 0 = do
-  print "End"
-  print env
-  return [env]
-run' env gen pos n = do
-  let nextPos = Environment.next env pos
-  if hasOrg env pos
-    then do
-      let creature = unsafeGetOrgAt env pos
-      let agedCreature = grow creature
-      if hasResources env pos && Organism.executable agedCreature
-        then do
-          print n
-          print env
-          -- print pos
-          let (g1, g2) = split gen
-          let (g21, g22) = split g2
-          -- print $ expression agedCreature
-          res <- unsafeGetRandomResource env g1 pos
-          -- print resource
-          executedCreature <- executeCreature agedCreature res
-          let outcome = register executedCreature
-          (_, envAfterAction) <- executeAction g2 env executedCreature pos outcome
-          let envWithoutRes = deleteSubResources envAfterAction pos res
-          -- print $ "outcome: " ++ show outcome
-          distributedEnv <- insertResourceAtNeighbour g21 envWithoutRes outcome pos
-          let envAfterInsertion = insertOrganismAt distributedEnv executedCreature pos
-          let total = Environment.getSize envAfterInsertion
-          let current = length $ getAllOrgs envAfterInsertion
-          if killable total current
-            then do
-              envAfterKilled <- kill envAfterInsertion $ div current 2
-              -- print envAfterKilled
-              rest <- run' envAfterKilled g22 nextPos $ n - 1
-              return $ envAfterKilled : rest
-            else do
-              -- print envAfterInsertion
-              rest <- run' envAfterInsertion g22 nextPos $ n - 1
-              return $ envAfterInsertion : rest
-        else do
-          let envAfterGrow = insertOrganismAt env agedCreature pos
-          rest <- run' envAfterGrow gen nextPos $ n - 1
-          return $ envAfterGrow : rest
-    else run' env gen nextPos $ n - 1
 
 run :: Environment Creature -> RunState Creature -> IO [Environment Creature]
 run env (RunState iteration runningQueue gen) = do
@@ -328,10 +304,11 @@ performAction gen env (Runnable org pos Execution (Res res)) = do
   let newCreature = grow executedCreature
   addedEnv <- addResourceToNeighbours gen env pos outcome
   return ([Runnable newCreature pos SystemCall Empty], addedEnv)
-performAction gen env (Runnable org pos SystemCall _) = do
+performAction gen env (Runnable org pos SystemCall res) = do
   print "doing a system call"
-  (runnable, envAfterSyscall) <- executeAction gen env org pos $ register org
-  return (Runnable org pos ResourceAquirement Empty : runnable, envAfterSyscall)
+  (h : r, envAfterSyscall) <- executeAction gen env (Runnable org pos SystemCall res) $ register org
+  let first = Runnable (organism h) (position h) ResourceAquirement Empty
+  return (first : r, envAfterSyscall)
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -362,4 +339,4 @@ mainCreature seed start iterations l divider = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 2 0 1000 5 10
+  mainCreature 2 0 250 5 10
