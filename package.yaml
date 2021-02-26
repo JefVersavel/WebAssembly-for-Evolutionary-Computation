@@ -36,6 +36,7 @@ dependencies:
   - matrix
   - cereal
   - data-ordlist
+  - tree-diff
 
 ghc-options: -Wall
 

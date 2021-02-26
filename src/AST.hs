@@ -6,6 +6,7 @@ import Binaryen.Op
 import BinaryenTranslation
 import Data.Aeson
 import Data.Serialize
+import Data.TreeDiff
 import GHC.Generics
 
 --- | Internal representation of an expression.
@@ -25,6 +26,8 @@ data ASTExpression
     RelOp RelationalOperation ASTExpression ASTExpression
   deriving (Generic)
 
+instance ToExpr ASTExpression
+
 -- | ASTExpression is an instance of Serialize so that it can ve serialized to analyse later.
 instance Serialize ASTExpression
 
@@ -38,6 +41,8 @@ instance Serialize BinaryOperation
 
 instance ToJSON BinaryOperation
 
+instance ToExpr BinaryOperation
+
 -- | Internal representation of a unary operation.
 data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
   deriving (Enum, Eq, Bounded, Generic)
@@ -46,6 +51,8 @@ instance Serialize UnaryOperation
 
 instance ToJSON UnaryOperation
 
+instance ToExpr UnaryOperation
+
 -- | Internal representation of a relational operation.
 data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
   deriving (Enum, Eq, Bounded, Generic)
@@ -53,6 +60,8 @@ data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
 instance Serialize RelationalOperation
 
 instance ToJSON RelationalOperation
+
+instance ToExpr RelationalOperation
 
 -- | Returns a string of the root of the AST, usefull for when only a short representation of an AST is needed.
 smallShow :: ASTExpression -> String

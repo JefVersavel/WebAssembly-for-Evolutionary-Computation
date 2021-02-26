@@ -8,6 +8,7 @@ import System.Directory
 class (Show a, Eq a) => Organism a where
   genotype :: a -> String
   executable :: a -> Bool
+  compatible :: a -> a -> Bool
 
 -- | The path at which the generated charts are located.
 chartPath :: String
