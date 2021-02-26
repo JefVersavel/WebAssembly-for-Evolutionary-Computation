@@ -137,4 +137,4 @@ genASTExpressions seed d nrParam ratio n = do
   sequence
     [generate g | g <- rampedHalfNHalf (mkQCGen seed) d nrParam ratio n]
 
-randomGenerationTest = genASTExpressions 12 5 1 0.5 2
+randomGenerationTest = genASTExpressions 12 10 1 0.5 2
