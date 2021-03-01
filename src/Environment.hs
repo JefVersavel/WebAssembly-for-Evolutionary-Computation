@@ -310,6 +310,18 @@ nillify = foldl deleteOrganismAt
 getNilNeighbours :: Organism a => Environment a -> Pos -> [Pos]
 getNilNeighbours env p = filter (isNil env) (getNeighbours env p)
 
+getCrossoverNeighbours :: Organism a => Environment a -> Pos -> Pos -> [Pos]
+getCrossoverNeighbours env lp rp =
+  List.nub $
+    filter
+      (\p -> p /= lp && p /= rp)
+      (getNeighbours env lp ++ getNeighbours env rp)
+
+getNilCrossoverNeighbours :: Organism a => Environment a -> Pos -> Pos -> [Pos]
+getNilCrossoverNeighbours env lp rp =
+  List.nub $
+    filter (isNil env) $ getCrossoverNeighbours env lp rp
+
 -- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt env org p

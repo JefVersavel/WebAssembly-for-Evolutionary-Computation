@@ -193,20 +193,20 @@ executeAction gen env runnable outcome = do
       reproduce gen env creature pos
     Up -> do
       print "moving up"
-      tryMovement runnable U env
+      tryMovement gen runnable U env
     Down -> do
       print "moving down"
-      tryMovement runnable D env
+      tryMovement gen runnable D env
     Rght -> do
       print "moving right"
-      tryMovement runnable R env
+      tryMovement gen runnable R env
     Lft -> do
       print "moving left"
-      tryMovement runnable L env
+      tryMovement gen runnable L env
     None -> print "do nothing" >> return ([runnable], env)
 
-tryMovement :: Runnable Creature -> Move -> Environment Creature -> IO ([Runnable Creature], Environment Creature)
-tryMovement (Runnable creature pos act res) mov env = case moveOrg env pos mov of
+tryMovement :: QCGen -> Runnable Creature -> Move -> Environment Creature -> IO ([Runnable Creature], Environment Creature)
+tryMovement gen (Runnable creature pos act res) mov env = case moveOrg env pos mov of
   Left (newPos, newEnv) -> do
     print newPos
     return ([Runnable creature newPos act res], newEnv)
@@ -214,7 +214,36 @@ tryMovement (Runnable creature pos act res) mov env = case moveOrg env pos mov o
     if compatible creature crossoverOrg
       then do
         print "add crossover here"
-        return ([Runnable creature pos act res], env)
+        let leftExpr = expression creature
+        let rightExpr = expression crossoverOrg
+        let (leftChild, rightChild, crossgen) = crossover gen leftExpr rightExpr
+        let (leftGen, rightGen) = split crossgen
+        let nils = getNilCrossoverNeighbours env pos newPos
+        let neighbours = getCrossoverNeighbours env pos newPos
+        leftSer <- serializeExpression leftChild 1
+        rightSer <- serializeExpression rightChild 1
+        let left = Creature leftChild (register creature) leftSer 0
+        let right = Creature rightChild (register crossoverOrg) rightSer 0
+        let runnables = [Runnable creature pos act res]
+        if length nils > 0
+          then do
+            leftPos <- selectPosition leftGen nils
+            let newEnv = insertOrganismAt env left leftPos
+            let runnables = runnables ++ [Runnable left leftPos ResourceAquirement Empty]
+                nils = filter (\e -> e /= leftPos) nils
+            if length nils > 0
+              then do
+                rightPos <- selectPosition rightGen nils
+                let newEnv = insertOrganismAt newEnv right rightPos
+                let runnables = runnables ++ [Runnable right rightPos ResourceAquirement Empty]
+                return (runnables, env)
+              else do
+                rightPos <- selectPosition rightGen neighbours
+                let newEnv = insertOrganismAt newEnv right rightPos
+                -- delete deleted orgs, is this also done with reproduction
+                let runnables = runnables ++ [Runnable right rightPos ResourceAquirement Empty]
+                return (runnables, env)
+          else return ([Runnable creature pos act res], env)
       else return ([Runnable creature pos act res], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
