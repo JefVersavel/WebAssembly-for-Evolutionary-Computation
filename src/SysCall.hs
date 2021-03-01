@@ -7,8 +7,8 @@ data SysCall
   | Reproduction
   | Up
   | Down
-  | Right
-  | Left
+  | Rght
+  | Lft
   deriving (Bounded, Enum, Show, Eq, Ord)
 
 -- | Returns the syscall that is associated with the given outcome of the orgamism

@@ -6,40 +6,16 @@ import Data.TreeDiff
 import qualified Generators as G
 
 compTest = do
-  let first = BinOp Add (Const 1) (Const 2)
-  let second = BinOp Add (Const 1) (Param 3)
-  let d = ediff first second
-  print (size first + size second)
+  trees <- G.randomGenerationTest
+  let first = head trees
+  let second = trees !! 1
   print $ matchingPercentage first second
-  let diff = getDiff first second * 2
-  print diff
-  print $ diff % (getNrNodes first + getNrNodes second)
   print $ getDiffRatio first second
 
-calculateDifference :: ASTExpression -> ASTExpression -> Int
-calculateDifference l r = fromIntegral (editDiff diffTree) `div` 2
-  where
-    diffTree = ediff l r
-
 matchingPercentage :: ASTExpression -> ASTExpression -> Ratio Int
-matchingPercentage l r = 1 - ((getDiff l r * 2) % (size l + size r))
-
-editDiff :: Edit EditExpr -> Int
-editDiff (Ins e) = editExprDiff e
-editDiff (Del e) = editExprDiff e
-editDiff (Cpy (EditApp _ l)) = sum $ map editDiff l
-editDiff (Cpy (EditLst l)) = sum $ map editDiff l
-editDiff (Cpy _) = 0
-editDiff (Swp l r) = editExprDiff l + editExprDiff r
-
-diff :: Expr -> Int
-diff (App _ l) = 1 + sum (map diff l)
-diff (Lst l) = sum $ map diff l
-
-editExprDiff :: EditExpr -> Int
-editExprDiff (EditApp _ l) = sum $ map editDiff l
-editExprDiff (EditLst l) = sum $ map editDiff l
-editExprDiff (EditExp e) = diff e
+matchingPercentage l r = 1 - uncurry (%) ratiotuple
+  where
+    ratiotuple = getDiffRatio l r
 
 class Difference a where
   getDiff :: a -> a -> Int
@@ -115,7 +91,7 @@ instance DifferenceRatio ASTExpression where
       rest = addTuple (getDiffRatio ll rl) (getDiffRatio lr rr)
       op = getDiffRatio opl opr
       num = fst rest + fst op
-      denom = (snd rest + snd op)
+      denom = snd rest + snd op
   -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
   getDiffRatio (BinOp _ ll lr) (RelOp _ rl rr) =
     (num, denom)
@@ -136,7 +112,7 @@ instance DifferenceRatio ASTExpression where
       rest = addTuple (getDiffRatio ll rl) (getDiffRatio lr rr)
       op = getDiffRatio opl opr
       num = fst rest + fst op
-      denom = (snd rest + snd op)
+      denom = snd rest + snd op
   -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
   getDiffRatio (RelOp opl ll lr) (BinOp opr rl rr) = getDiffRatio (BinOp opr rl rr) (RelOp opl ll lr)
   getDiffRatio (RelOp _ ll lr) (UnOp _ rl) =
@@ -151,7 +127,7 @@ instance DifferenceRatio ASTExpression where
       rest = getDiffRatio r l
       op = getDiffRatio opl opr
       num = fst rest + fst op
-      denom = (snd rest + snd op)
+      denom = snd rest + snd op
   getDiffRatio (UnOp opl ll) (BinOp opr rl rr) = getDiffRatio (BinOp opr rl rr) (UnOp opl ll)
   getDiffRatio (UnOp opl ll) (RelOp opr rl rr) = getDiffRatio (RelOp opr rl rr) (UnOp opl ll)
 

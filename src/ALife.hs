@@ -6,17 +6,20 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Compatibility
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString as BS
 import qualified Data.List as List
 import Data.Matrix
+import Data.Ratio
 import qualified Data.Text as T
 import Environment
 import ExecuteWasm
 import GHC.Generics
 import Generators
 import GeneticOperations
+import Interaction
 import Movement
 import Organism
 import Running
@@ -54,6 +57,10 @@ instance Organism Creature where
     where
       firstOp = T.unpack $ T.strip $ T.pack $ smallShow $ expression creature
   executable creature = age creature > 1
+  compatible l r = double >= compatibility
+    where
+      match = matchingPercentage (expression l) (expression r)
+      double = (fromIntegral (numerator match) :: Double) / (fromIntegral (denominator match) :: Double)
 
 instance Show Creature where
   show (Creature e r _ a) =
@@ -180,33 +187,35 @@ executeAction ::
 executeAction gen env runnable outcome = do
   let creature = organism runnable
   let pos = position runnable
-  let act = action runnable
-  let res = resource runnable
   case toSysCall outcome of
     Reproduction -> do
       print "reproducing"
       reproduce gen env creature pos
     Up -> do
       print "moving up"
-      let (newPos, newEnv) = moveOrg env pos U
-      print newPos
-      return ([Runnable creature newPos act res], newEnv)
+      tryMovement runnable U env
     Down -> do
       print "moving down"
-      let (newPos, newEnv) = moveOrg env pos D
-      print newPos
-      return ([Runnable creature newPos act res], newEnv)
-    SysCall.Right -> do
+      tryMovement runnable D env
+    Rght -> do
       print "moving right"
-      let (newPos, newEnv) = moveOrg env pos R
-      print newPos
-      return ([Runnable creature newPos act res], newEnv)
-    SysCall.Left -> do
+      tryMovement runnable R env
+    Lft -> do
       print "moving left"
-      let (newPos, newEnv) = moveOrg env pos L
-      print newPos
-      return ([Runnable creature newPos act res], newEnv)
+      tryMovement runnable L env
     None -> print "do nothing" >> return ([runnable], env)
+
+tryMovement :: Runnable Creature -> Move -> Environment Creature -> IO ([Runnable Creature], Environment Creature)
+tryMovement (Runnable creature pos act res) mov env = case moveOrg env pos mov of
+  Left (newPos, newEnv) -> do
+    print newPos
+    return ([Runnable creature newPos act res], newEnv)
+  Right (crossoverOrg, newPos) -> do
+    if compatible creature crossoverOrg
+      then do
+        print "add crossover here"
+        return ([Runnable creature pos act res], env)
+      else return ([Runnable creature pos act res], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
 getAgePos :: Environment Creature -> [(Int, Gen Pos)]

@@ -7,7 +7,7 @@ import Organism
 import Test.QuickCheck.Random
 
 -- | Data type for the different actions that an organism can or has to do.
-data Action = ResourceAquirement | Execution | SystemCall
+data Action = ResourceAquirement | Execution | SystemCall | Interact
   deriving (Show)
 
 data Storage = Res Resource | Empty
@@ -58,6 +58,7 @@ nextAction :: Action -> Action
 nextAction ResourceAquirement = Execution
 nextAction Execution = SystemCall
 nextAction SystemCall = ResourceAquirement
+nextAction Interact = ResourceAquirement
 
 -- | Advances the action of the runnable to the next action.
 next :: Runnable a -> Runnable a
