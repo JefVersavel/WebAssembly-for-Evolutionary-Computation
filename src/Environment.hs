@@ -322,6 +322,25 @@ getNilCrossoverNeighbours env lp rp =
   List.nub $
     filter (isNil env) $ getCrossoverNeighbours env lp rp
 
+getChildPositions :: Organism a => QCGen -> Environment a -> Pos -> Pos -> IO (Pos, Pos)
+getChildPositions gen env lp rp = do
+  let nils = getNilCrossoverNeighbours env lp rp
+      neighs = getCrossoverNeighbours env lp rp
+      (g', g'') = R.split gen
+  case length nils of
+    0 -> do
+      (leftPos, rest) <- selectPosition' g' neighs
+      rightPos <- selectPosition g'' rest
+      return (leftPos, rightPos)
+    1 -> do
+      let leftPos = head nils
+      rightPos <- selectPosition g'' neighs
+      return (leftPos, rightPos)
+    _ -> do
+      (leftPos, rest) <- selectPosition' g' nils
+      rightPos <- selectPosition g'' rest
+      return (leftPos, rightPos)
+
 -- | Insterts a given organism at a given position in the environment.
 insertOrganismAt :: Organism a => Environment a -> a -> Pos -> Environment a
 insertOrganismAt env org p
@@ -416,6 +435,12 @@ initializeEnvironment n gen orgList lim = do
 -- | Generate a random position from a list of positions.
 selectPosition :: QCGen -> [Pos] -> IO Pos
 selectPosition gen positions = QC.generate $ useSeed gen $ QC.elements positions
+
+selectPosition' :: QCGen -> [Pos] -> IO (Pos, [Pos])
+selectPosition' gen positions = do
+  pos <- selectPosition gen positions
+  let rest = List.delete pos positions
+  return (pos, rest)
 
 -- | Generate a list of unique random positions of a given length within the limits of the environment.
 generateRandomPositions :: Organism a => QCGen -> Environment a -> Int -> [Pos]

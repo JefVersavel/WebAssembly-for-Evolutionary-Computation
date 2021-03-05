@@ -73,7 +73,7 @@ type GenotypePop = [(String, Int)]
 serialize :: [Environment Creature] -> String -> IO ()
 serialize envs name = do
   let giantList = map envToLists envs
-  let directory = "./jsonSysCall/"
+      directory = "./jsonSysCall/"
   createDirectoryIfMissing True directory
   encodeFile (directory ++ name) $ toJSON giantList
 
@@ -158,92 +158,95 @@ mutationChance :: Int
 mutationChance = 4
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
--- It also is poxxible by chance that the reproduced creature is mutated.
-reproduce :: QCGen -> Environment Creature -> Creature -> Pos -> IO ([Runnable Creature], Environment Creature)
-reproduce gen env creature pos = do
+-- It also is possible by chance that the reproduced creature is mutated.
+reproduce ::
+  QCGen ->
+  Environment Creature ->
+  [Runnable Creature] ->
+  IO ([Runnable Creature], Environment Creature)
+reproduce _ env [] = return ([], env)
+reproduce gen env ((Runnable creature pos _ _) : rest) = do
   let nils = getNilNeighbours env pos
-  let newCreature = reborn creature
-  let (g1, g2) = split gen
-  let (n, g3) = randomR (1, mutationChance) g1
+      newCreature = reborn creature
+      (g1, g2) = split gen
+      (n, g3) = randomR (1, mutationChance) g1
   childPos <-
     if null nils
       then selectPosition g2 $ getNeighbours env pos
       else selectPosition g2 nils
+  let newRest = filter (\(Runnable _ p _ _) -> p /= childPos) rest
   if n == 1
     then do
       print "mutate"
       mutated <- mutateCreature g3 newCreature
-      return ([Runnable mutated childPos ResourceAquirement Empty], insertOrganismAt env mutated childPos)
+      return
+        ( newRest ++ [Runnable mutated childPos ResourceAquirement Empty],
+          insertOrganismAt env mutated childPos
+        )
     else do
-      return ([Runnable newCreature childPos ResourceAquirement Empty], insertOrganismAt env newCreature childPos)
+      return
+        ( newRest ++ [Runnable newCreature childPos ResourceAquirement Empty],
+          insertOrganismAt env newCreature childPos
+        )
 
 -- | Performs an action on the environment based on the outcome of the execution of the creature.
 executeAction ::
   QCGen ->
   Environment Creature ->
-  Runnable Creature ->
+  [Runnable Creature] ->
   Double ->
   IO ([Runnable Creature], Environment Creature)
-executeAction gen env runnable outcome = do
-  let creature = organism runnable
-  let pos = position runnable
+executeAction gen env runnables outcome = do
   case toSysCall outcome of
     Reproduction -> do
       print "reproducing"
-      reproduce gen env creature pos
+      reproduce gen env runnables
     Up -> do
       print "moving up"
-      tryMovement gen runnable U env
+      tryMovement gen runnables U env
     Down -> do
       print "moving down"
-      tryMovement gen runnable D env
+      tryMovement gen runnables D env
     Rght -> do
       print "moving right"
-      tryMovement gen runnable R env
+      tryMovement gen runnables R env
     Lft -> do
       print "moving left"
-      tryMovement gen runnable L env
-    None -> print "do nothing" >> return ([runnable], env)
+      tryMovement gen runnables L env
+    None -> print "do nothing" >> return (runnables, env)
 
-tryMovement :: QCGen -> Runnable Creature -> Move -> Environment Creature -> IO ([Runnable Creature], Environment Creature)
-tryMovement gen (Runnable creature pos act res) mov env = case moveOrg env pos mov of
+tryMovement ::
+  QCGen ->
+  [Runnable Creature] ->
+  Move ->
+  Environment Creature ->
+  IO ([Runnable Creature], Environment Creature)
+tryMovement _ [] _ env = return ([], env)
+tryMovement gen (currentRunnable@(Runnable creature pos act res) : rest) mov env = case moveOrg env pos mov of
   Left (newPos, newEnv) -> do
     print newPos
-    return ([Runnable creature newPos act res], newEnv)
+    return (rest ++ [Runnable creature newPos act res], newEnv)
   Right (crossoverOrg, newPos) -> do
     if compatible creature crossoverOrg
       then do
         print "add crossover here"
         let leftExpr = expression creature
-        let rightExpr = expression crossoverOrg
-        let (leftChild, rightChild, crossgen) = crossover gen leftExpr rightExpr
-        let (leftGen, rightGen) = split crossgen
-        let nils = getNilCrossoverNeighbours env pos newPos
-        let neighbours = getCrossoverNeighbours env pos newPos
+            rightExpr = expression crossoverOrg
+            (leftChild, rightChild, crossgen) = crossover gen leftExpr rightExpr
         leftSer <- serializeExpression leftChild 1
         rightSer <- serializeExpression rightChild 1
-        let left = Creature leftChild (register creature) leftSer 0
-        let right = Creature rightChild (register crossoverOrg) rightSer 0
-        let runnables = [Runnable creature pos act res]
-        if length nils > 0
-          then do
-            leftPos <- selectPosition leftGen nils
-            let newEnv = insertOrganismAt env left leftPos
-            let runnables = runnables ++ [Runnable left leftPos ResourceAquirement Empty]
-                nils = filter (\e -> e /= leftPos) nils
-            if length nils > 0
-              then do
-                rightPos <- selectPosition rightGen nils
-                let newEnv = insertOrganismAt newEnv right rightPos
-                let runnables = runnables ++ [Runnable right rightPos ResourceAquirement Empty]
-                return (runnables, env)
-              else do
-                rightPos <- selectPosition rightGen neighbours
-                let newEnv = insertOrganismAt newEnv right rightPos
-                -- delete deleted orgs, is this also done with reproduction
-                let runnables = runnables ++ [Runnable right rightPos ResourceAquirement Empty]
-                return (runnables, env)
-          else return ([Runnable creature pos act res], env)
+        (lPos, rPos) <- getChildPositions crossgen env pos newPos
+        let lft = Creature leftChild (register creature) leftSer 0
+            rght = Creature rightChild (register crossoverOrg) rightSer 0
+            newEnv = insertOrganismAt (insertOrganismAt env lft lPos) rght rPos
+            leftRunnable = Runnable lft lPos ResourceAquirement Empty
+            rightRunnable = Runnable lft rPos ResourceAquirement Empty
+            newQueue =
+              filter
+                (\(Runnable _ p _ _) -> not (p == lPos || p == rPos))
+                rest
+                ++ [currentRunnable, leftRunnable, rightRunnable]
+        return (newQueue, newEnv)
       else return ([Runnable creature pos act res], env)
 
 -- | Returns a list of tuples with the age of the creature at that position and a generator of the position.
@@ -287,22 +290,23 @@ run env (RunState iteration runningQueue gen) = do
     then return [env]
     else do
       let (leftGen, rightGen) = split gen
-      let currentRunnable = head runningQueue
+          currentRunnable = head runningQueue
       print "organism:"
       print $ organism currentRunnable
-      let rest = tail runningQueue
-      (runnables, newEnv) <- performAction leftGen env currentRunnable
-      let newRunnables = rest ++ runnables
+      (newRunnables, newEnv) <- performAction leftGen env runningQueue
       let total = Environment.getSize newEnv
-      let current = length newRunnables
-      let newIteration = iteration - 1
+          current = length newRunnables
+          newIteration = iteration - 1
       if killable total current
         then do
           print "killing things"
           kills <- killPositions newEnv $ div current 2
-          let runnablesAfterKilled = filter (\(Runnable _ pos _ _) -> pos `notElem` kills) newRunnables
-          let newState = RunState newIteration runnablesAfterKilled rightGen
-          let envAfterKilled = nillify newEnv kills
+          let runnablesAfterKilled =
+                filter
+                  (\(Runnable _ pos _ _) -> pos `notElem` kills)
+                  newRunnables
+              newState = RunState newIteration runnablesAfterKilled rightGen
+              envAfterKilled = nillify newEnv kills
           print envAfterKilled
           restRun <- run envAfterKilled newState
           return $ env : restRun
@@ -316,9 +320,10 @@ run env (RunState iteration runningQueue gen) = do
 performAction ::
   QCGen ->
   Environment Creature ->
-  Runnable Creature ->
+  [Runnable Creature] ->
   IO ([Runnable Creature], Environment Creature)
-performAction gen env (Runnable org pos ResourceAquirement res) = do
+performAction _ env [] = return ([], env)
+performAction gen env (Runnable org pos ResourceAquirement res : rest) = do
   print "trying to aquire resources"
   if hasResources env pos
     then do
@@ -327,26 +332,24 @@ performAction gen env (Runnable org pos ResourceAquirement res) = do
       print newRes
       let deletedEnv = deleteSubResources env pos newRes
       return
-        ([Runnable org pos (nextAction ResourceAquirement) (Res newRes)], deletedEnv)
+        (rest ++ [Runnable org pos (nextAction ResourceAquirement) (Res newRes)], deletedEnv)
     else do
       print "no resource found"
-      return ([Runnable org pos ResourceAquirement res], env)
-performAction _ env (Runnable org pos Execution Empty) = do
+      return (rest ++ [Runnable org pos ResourceAquirement res], env)
+performAction _ env (Runnable org pos Execution Empty : rest) = do
   print "execution without resources is not possible"
-  return ([Runnable org pos ResourceAquirement Empty], env)
-performAction gen env (Runnable org pos Execution (Res res)) = do
+  return (rest ++ [Runnable org pos ResourceAquirement Empty], env)
+performAction gen env (Runnable org pos Execution (Res res) : rest) = do
   print "execution"
   print $ expression org
   executedCreature <- executeCreature org res
   let outcome = register executedCreature
-  let newCreature = grow executedCreature
+      newCreature = grow executedCreature
   addedEnv <- addResourceToNeighbours gen env pos outcome
-  return ([Runnable newCreature pos SystemCall Empty], addedEnv)
-performAction gen env (Runnable org pos SystemCall res) = do
+  return (rest ++ [Runnable newCreature pos SystemCall Empty], addedEnv)
+performAction gen env runnables@(Runnable org _ SystemCall _ : _) = do
   print "doing a system call"
-  (h : r, envAfterSyscall) <- executeAction gen env (Runnable org pos SystemCall res) $ register org
-  let first = Runnable (organism h) (position h) ResourceAquirement Empty
-  return (first : r, envAfterSyscall)
+  executeAction gen env runnables $ register org
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -366,8 +369,8 @@ makeState env iterations =
 mainCreature :: Seed -> Double -> Int -> Int -> Int -> IO ()
 mainCreature seed start iterations l divider = do
   let name = "seed= " ++ show seed ++ "_iterations= " ++ show iterations ++ "_limit= " ++ show l ++ "_divider= " ++ show divider
-  let (g1, g2) = split $ mkQCGen seed
-  let lim = (l, l)
+      (g1, g2) = split $ mkQCGen seed
+      lim = (l, l)
   env <- initEnvironment g1 Moore lim start divider
   print "Init"
   print env
