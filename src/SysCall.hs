@@ -3,8 +3,8 @@ module SysCall where
 -- | Represents the call that an organism can make to the host.
 -- The calls are then performed by the host.
 data SysCall
-  = None
-  | Reproduction
+  = Reproduction
+  | None
   | Up
   | Down
   | Rght

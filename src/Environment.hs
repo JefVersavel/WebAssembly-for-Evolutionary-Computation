@@ -26,7 +26,7 @@ data Life a = Organism a => Nil | Org a
 type Cell a = (Life a, [Resource])
 
 instance (Show a, Organism a) => Show (Life a) where
-  show Nil = "Nil"
+  show Nil = "Nil" ++ replicate 13 ' '
   show (Org org) = genotype org
 
 -- | Represents the environment with cells and the neighbourhood and limits of the environment.
@@ -52,13 +52,26 @@ getY (_, y) = y
 -- | Returns a textual representation of a list of rows from the grid.
 showCells :: Organism a => [[Cell a]] -> String
 showCells [] = ""
-showCells (row : rest) = showRow row ++ "\n" ++ showCells rest
+showCells (row : rest) = "[" ++ showRow row ++ "]" ++ "\n" ++ showCells rest
 
 -- | Returns a textual representation of a row on the grid.
 showRow :: Organism a => [Cell a] -> String
 showRow [] = ""
-showRow [c] = show c
-showRow (c : cs) = show c ++ ", " ++ showRow cs
+showRow [(life, res)] =
+  "(" ++ show life ++ ", "
+    ++ showResources res
+    ++ ")"
+showRow ((life, res) : cs) =
+  "(" ++ show life ++ ", "
+    ++ showResources res
+    ++ "), \t"
+    ++ showRow cs
+
+showResources :: [Resource] -> String
+showResources [] = "   "
+showResources _ = "RES"
+
+-- showResources l = show [round r :: Int | r <- l]
 
 -- | The neighbourhood of an environment which affects wich cells are neighbours of eachother.
 -- https://en.wikipedia.org/wiki/Moore_neighborhood

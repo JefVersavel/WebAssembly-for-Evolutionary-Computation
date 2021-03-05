@@ -43,7 +43,10 @@ movePos env pos R = right env pos
 -- when there is an organims in the new position than the environment remains unchanged.
 moveOrg :: Organism a => Environment a -> Pos -> Move -> Either (Pos, Environment a) (a, Pos)
 moveOrg env pos move
-  | hasOrg env newPos = Right (fromJust $ getOrgAt env newPos, newPos)
+  | hasOrg env newPos =
+    if pos == newPos
+      then Left (pos, env)
+      else Right (fromJust $ getOrgAt env newPos, newPos)
   | otherwise = case org of
     Just o ->
       if legalPos newPos $ limits env
