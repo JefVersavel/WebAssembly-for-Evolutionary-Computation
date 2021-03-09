@@ -119,27 +119,30 @@ getRandomRegister gen env pos crea =
     org = getOrgAt env pos
     resources = getResourcesAt env pos
 
--- | Generates an initial population of creatures with and a bound for the initial value of the registers of the creatures and the limits of the environment.
--- The amount of creatures that need to be generated is equal to at least a tenth of the total cells in the environment.
-generateInitPop :: QCGen -> Double -> Lim -> Int -> IO [Creature]
-generateInitPop gen start lim divider = do
+-- | Generates an initial population of creatures with and a bound for the initial i
+-- value of the registers of the creatures and the limits of the environment.
+-- The amount of creatures that need to be generated is equal to at least a
+-- tenth of the total cells in the environment.
+generateInitPop :: QCGen -> Double -> Depth -> Lim -> Int -> IO [Creature]
+generateInitPop gen start depth lim divider = do
   let s = uncurry (*) lim `div` divider + 1
   let (g1, g2) = split gen
-  ex <- sequence [generate g | g <- rampedHalfNHalf g1 5 1 0.5 s]
+  ex <- sequence [generate g | g <- rampedHalfNHalf g1 depth 1 0.5 s]
   let starts = generateStart g2 s start
   serializeds <- serializeExpressions ex 1
   return [Creature e st b 0 | ((e, st), b) <- zip (zip ex starts) (map snd serializeds)]
 
--- | Generates a list of random values for the registers of the creatures with a given bound and size of that list.
+-- | Generates a list of random values for the registers of the creatures
+-- with a given bound and size of that list.
 generateStart :: QCGen -> Size -> Double -> [Double]
 generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Int -> IO (Environment Creature)
-initEnvironment gen n l s divider = do
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> IO (Environment Creature)
+initEnvironment gen n l s depth divider = do
   let (g1, g2) = split gen
-  pop <- generateInitPop g1 s l divider
+  pop <- generateInitPop g1 s depth l divider
   initializeEnvironment n g2 pop l
 
 -- | Performs sun-tree mutation of the given list of creatures.
@@ -166,13 +169,14 @@ reproduce ::
   QCGen ->
   Environment Creature ->
   [Runnable Creature] ->
+  Int ->
   IO ([Runnable Creature], Environment Creature)
-reproduce _ env [] = return ([], env)
-reproduce gen env ((Runnable creature pos _ _) : rest) = do
+reproduce _ env [] _ = return ([], env)
+reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate = do
   let nils = getNilNeighbours env pos
       newCreature = reborn creature
       (g1, g2) = split gen
-      (n, g3) = randomR (1, mutationChance) g1
+      (n, g3) = randomR (1, mutationRate) g1
   childPos <-
     if null nils
       then selectPosition g2 $ getNeighbours env pos
@@ -205,13 +209,14 @@ executeAction ::
   Environment Creature ->
   [Runnable Creature] ->
   Double ->
+  Int ->
   IO ([Runnable Creature], Environment Creature)
-executeAction _ env [] _ = return ([], env)
-executeAction gen env runnables@(x : xs) outcome = do
+executeAction _ env [] _ _ = return ([], env)
+executeAction gen env runnables@(x : xs) outcome mutationRate = do
   case toSysCall outcome of
     Reproduction -> do
       print "reproducing"
-      reproduce gen env runnables
+      reproduce gen env runnables mutationRate
     Up -> do
       print "moving up"
       tryMovement gen runnables U env
@@ -330,7 +335,7 @@ killableEnv :: Environment Creature -> Bool
 killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
 
 run :: Environment Creature -> RunState Creature -> IO [Environment Creature]
-run env (RunState iteration runningQueue gen) = do
+run env (RunState iteration runningQueue gen mutationRate) = do
   print ""
   print iteration
   print runningQueue
@@ -341,7 +346,7 @@ run env (RunState iteration runningQueue gen) = do
           currentRunnable = head runningQueue
       print "organism:"
       print $ organism currentRunnable
-      (newRunnables, newEnv) <- performAction leftGen env runningQueue
+      (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate
       let total = Environment.getSize newEnv
           current = length newRunnables
           newIteration = iteration - 1
@@ -356,7 +361,7 @@ run env (RunState iteration runningQueue gen) = do
                   (\(Runnable _ pos _ _) -> pos `notElem` kills)
                   newRunnables
           print "second ok"
-          let newState = RunState newIteration runnablesAfterKilled g''
+          let newState = RunState newIteration runnablesAfterKilled g'' mutationRate
           print "third ok"
           let envAfterKilled = nillify newEnv kills
           print "fourth ok"
@@ -365,7 +370,7 @@ run env (RunState iteration runningQueue gen) = do
           return $ env : restRun
         else do
           print "not killing things"
-          let newState = RunState newIteration newRunnables rightGen
+          let newState = RunState newIteration newRunnables rightGen mutationRate
           print newEnv
           restRun <- run newEnv newState
           return $ env : restRun
@@ -374,9 +379,10 @@ performAction ::
   QCGen ->
   Environment Creature ->
   [Runnable Creature] ->
+  Int ->
   IO ([Runnable Creature], Environment Creature)
-performAction _ env [] = return ([], env)
-performAction gen env (Runnable org pos ResourceAquirement res : rest) = do
+performAction _ env [] _ = return ([], env)
+performAction gen env (Runnable org pos ResourceAquirement res : rest) _ = do
   print "trying to aquire resources"
   if hasResources env pos
     then do
@@ -389,10 +395,10 @@ performAction gen env (Runnable org pos ResourceAquirement res : rest) = do
     else do
       print "no resource found"
       return (rest ++ [Runnable org pos ResourceAquirement res], env)
-performAction _ env (Runnable org pos Execution Empty : rest) = do
+performAction _ env (Runnable org pos Execution Empty : rest) _ = do
   print "execution without resources is not possible"
   return (rest ++ [Runnable org pos ResourceAquirement Empty], env)
-performAction gen env (Runnable org pos Execution (Res res) : rest) = do
+performAction gen env (Runnable org pos Execution (Res res) : rest) _ = do
   print "execution"
   print $ expression org
   executedCreature <- executeCreature org res
@@ -401,16 +407,16 @@ performAction gen env (Runnable org pos Execution (Res res) : rest) = do
   addedEnv <- addResourceToNeighbours gen env pos outcome
   let addedEnv' = insertOrganismAt addedEnv newCreature pos
   return (rest ++ [Runnable newCreature pos SystemCall Empty], addedEnv')
-performAction gen env runnables@(Runnable org _ SystemCall _ : _) = do
+performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate = do
   print "doing a system call"
-  executeAction gen env runnables $ register org
+  executeAction gen env runnables (register org) mutationRate
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
 insertNewOrg runnables new pos = runnables ++ [Runnable new pos ResourceAquirement Empty]
 
 -- | Prepares the initial state for a simulation.
-makeState :: Environment Creature -> Int -> QCGen -> RunState Creature
+makeState :: Environment Creature -> Int -> QCGen -> Int -> RunState Creature
 makeState env iterations =
   RunState
     iterations
@@ -420,18 +426,29 @@ makeState env iterations =
     )
 
 -- | The main function.
-mainCreature :: Seed -> Double -> Int -> Int -> Int -> IO ()
-mainCreature seed start iterations l divider = do
-  let name = "seed= " ++ show seed ++ "_iterations= " ++ show iterations ++ "_limit= " ++ show l ++ "_divider= " ++ show divider
+mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> IO ()
+mainCreature seed start iterations l depth mutationRate divider = do
+  let name =
+        "seed= " ++ show seed
+          ++ "_iterations= "
+          ++ show iterations
+          ++ "_limit= "
+          ++ show l
+          ++ "_maxDepth= "
+          ++ show depth
+          ++ "_mutationRate= "
+          ++ show mutationRate
+          ++ "_divider= "
+          ++ show divider
       (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
-  env <- initEnvironment g1 Moore lim start divider
+  env <- initEnvironment g1 Moore lim start depth divider
   print "Init"
   print env
-  let firstState = makeState env iterations g2
+  let firstState = makeState env iterations g2 mutationRate
   envList <- run env firstState
   serialize (env : envList) name
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 2 0 1000 50 10
+  mainCreature 2 10 1000 5 6 4 10

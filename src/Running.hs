@@ -34,7 +34,7 @@ instance Show (Runnable a) where
       ++ "\n"
 
 -- | Represents that state that is kept during the running of a simulation
-data RunState a = Organism a => RunState Int [Runnable a] QCGen
+data RunState a = Organism a => RunState Int [Runnable a] QCGen Int
 
 -- | Sets the action of the runnable to the given action.
 setAction :: Runnable a -> Action -> Runnable a

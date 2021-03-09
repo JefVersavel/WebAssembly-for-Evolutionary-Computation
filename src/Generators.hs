@@ -92,7 +92,7 @@ growOneInit gen = do
 
 -- | FULL algorithm that builds a generator for an ASTExpression.
 -- As long as the depth is shorter than the given maximum depth only non-leaf nodes can be selected.
--- Once the given maximum epth is reached only leaf nodes an be chosen such as a constant or a parameter.
+-- Once the given maximum depth is reached only leaf nodes can be chosen such as a constant or a parameter.
 -- The maximum depth and the number of parameters are registered using the Reader monad.
 fullOne :: Depth -> Reader (Depth, NrParam) (Gen ASTExpression)
 fullOne d = do
@@ -116,7 +116,8 @@ fullOneInit gen = do
   let seeded = useSeed gen g
   return seeded
 
--- | Returns a list of generators for expressions given an initial QCGen and a ratio of generators that were conceived using the GROW and FULL method.
+-- | Returns a list of generators for expressions given an initial QCGen and a ratio of generators
+-- that were conceived using the GROW and FULL method.
 rampedHalfNHalf :: QCGen -> Depth -> NrParam -> Ratio -> Size -> [Gen ASTExpression]
 rampedHalfNHalf gen d nrParam ratio n
   | ratio <= 1 && ratio >= 0 = growList ++ fullList
@@ -128,9 +129,10 @@ rampedHalfNHalf gen d nrParam ratio n
     growList = generateInitList growSeeds growOneInit
     fullList = generateInitList fullSeeds fullOneInit
     generateInitList gens method =
-      [runReader (method g) (fst $ randomR (0, d) g, nrParam) | g <- gens]
+      [runReader (method g) (fst $ randomR (1, d) g, nrParam) | g <- gens]
 
--- | Returns a list of generators given the initial seed, maximium depth, number of paramets. ratio of GROW and FULL and the lenght of the list of generators.
+-- | Returns a list of generators given the initial seed, maximium depth, number of paramets.
+-- ratio of GROW and FULL and the lenght of the list of generators.
 -- The list of gnerators are conceived using rampedHalfNHalf.
 genASTExpressions :: Seed -> Depth -> NrParam -> Ratio -> Size -> IO [ASTExpression]
 genASTExpressions seed d nrParam ratio n = do
