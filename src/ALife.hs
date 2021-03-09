@@ -434,4 +434,4 @@ mainCreature seed start iterations l divider = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 2 0 1000 5 10
+  mainCreature 2 0 1000 50 10

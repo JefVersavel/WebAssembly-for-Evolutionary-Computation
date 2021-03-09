@@ -1,7 +1,7 @@
 import json
 import pathlib
 import os
-
+import imageio
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -53,12 +53,12 @@ def makeResourceArray(generalArray):
 
     return orgArray, resArray
 
-
 for (obj, name) in objs:
+    images: list = []
     print(name)
     largest = 1
     dir = "../figssyscall/" + name
-    os.makedirs("../figssyscall/" + name)
+    os.makedirs("../figssyscall/" + name, exist_ok=True)
     for env in obj:
         _, res = makeResourceArray(env)
         ress = np.flipud(np.array(res))
@@ -75,4 +75,11 @@ for (obj, name) in objs:
         plt.title("Iteration " + str(i))
         plt.xlim(0, len(res))
         plt.ylim([0, len(res[0])])
-        plt.savefig(dir + "/" + str(i) + ".png")
+        imName: str = dir + "/" + str(i) + ".png"
+        plt.savefig(imName)
+        im = imageio.imread(imName)
+        images.append(im)
+
+    print(len(images))
+    gifName: str = dir + "/" + name + ".gif"
+    imageio.mimwrite(gifName, images, format='.gif', fps=1)
