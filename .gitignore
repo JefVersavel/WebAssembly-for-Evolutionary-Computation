@@ -23,3 +23,6 @@ jsonEnv/
 *.gif
 
 test.txt
+csv/
+
+*.log

@@ -335,6 +335,9 @@ killableEnv :: Environment Creature -> Bool
 killableEnv env = killable (Environment.getSize env) (length $ getAllOrgs env)
 
 run :: Environment Creature -> RunState Creature -> IO [Environment Creature]
+run env (RunState _ [] _ _) = do
+  print "no organisms found"
+  return [env]
 run env (RunState iteration runningQueue gen mutationRate) = do
   print ""
   print iteration
@@ -442,6 +445,7 @@ mainCreature seed start iterations l depth mutationRate divider = do
           ++ show divider
       (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
+  print name
   env <- initEnvironment g1 Moore lim start depth divider
   print "Init"
   print env

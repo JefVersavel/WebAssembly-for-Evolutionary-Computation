@@ -37,6 +37,8 @@ dependencies:
   - cereal
   - data-ordlist
   - tree-diff
+  - cassava
+  - vector
 
 ghc-options: -Wall
 

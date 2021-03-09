@@ -70,7 +70,6 @@ def main():
             if largest < m:
                 largest = m
         for i in range(len(obj) - 1):
-            print(i)
             org, res = makeResourceArray(obj[i])
             orgs = np.flipud(np.array(org))
             ress = np.flipud(np.array(res))
@@ -90,7 +89,6 @@ def main():
 
         gifDir = "./gifs"
         os.makedirs(gifDir, exist_ok=True)
-        print(len(images))
         gifName: str = gifDir + "/" + name + ".gif"
         imageio.mimwrite(gifName, images, format='.gif', fps=10)
 
