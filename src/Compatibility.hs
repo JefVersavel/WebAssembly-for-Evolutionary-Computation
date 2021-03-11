@@ -6,145 +6,93 @@ import Data.TreeDiff
 import qualified Generators as G
 
 compTest = do
-  trees <- G.randomGenerationTest
-  let first = head trees
-  let second = trees !! 1
+  let first = Const 1
+  let second = BinOp Add (Const 1) (Const 5)
+  print $ prettyEditExpr $ ediff first second
   print $ matchingPercentage first second
-  print $ getDiffRatio first second
+  print $ getMatchingRatio first second
+  print $ differencePercentage first second
 
 matchingPercentage :: ASTExpression -> ASTExpression -> Ratio Int
-matchingPercentage l r = 1 - uncurry (%) ratiotuple
-  where
-    ratiotuple = getDiffRatio l r
+matchingPercentage l r = uncurry (%) (getMatchingRatio l r)
 
-class Difference a where
-  getDiff :: a -> a -> Int
+differencePercentage :: ASTExpression -> ASTExpression -> Ratio Int
+differencePercentage l r = 1 - uncurry (%) (getMatchingRatio l r)
 
-instance Difference ASTExpression where
-  getDiff (Const l) (Const r)
-    | l == r = 0
-    | otherwise = 1
-  getDiff (Const _) l = size l
-  getDiff r (Const _) = size r
-  getDiff (Param l) (Param r)
-    | l == r = 0
-    | otherwise = 1
-  getDiff (Param _) l = size l
-  getDiff r (Param _) = size r
-  getDiff (BinOp opl ll lr) (BinOp opr rl rr) =
-    getDiff opl opr
-      + getDiff ll rl
-      + getDiff lr rr
-  -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiff (BinOp _ ll lr) (RelOp _ rl rr) =
-    1
-      + getDiff ll rl
-      + getDiff lr rr
-  -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiff (BinOp _ ll lr) (UnOp _ rl) =
-    1
-      + minimum [getDiff ll rl, getDiff lr rl]
-  getDiff (RelOp opl ll lr) (RelOp opr rl rr) =
-    getDiff opl opr
-      + getDiff ll rl
-      + getDiff lr rr
-  -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiff (RelOp opl ll lr) (BinOp opr rl rr) = getDiff (BinOp opr rl rr) (RelOp opl ll lr)
-  getDiff (RelOp _ ll lr) (UnOp _ rl) =
-    1 + minimum [getDiff ll rl, getDiff lr rl]
-  getDiff (UnOp opl l) (UnOp opr r) = getDiff opl opr + getDiff r l
-  getDiff (UnOp opl ll) (BinOp opr rl rr) = getDiff (BinOp opr rl rr) (UnOp opl ll)
-  getDiff (UnOp opl ll) (RelOp opr rl rr) = getDiff (RelOp opr rl rr) (UnOp opl ll)
+class MatchingRatio a where
+  getMatchingRatio :: a -> a -> (Int, Int)
 
-instance Difference BinaryOperation where
-  getDiff l r
-    | l == r = 0
-    | otherwise = 1
-
-instance Difference UnaryOperation where
-  getDiff l r
-    | l == r = 0
-    | otherwise = 1
-
-instance Difference RelationalOperation where
-  getDiff l r
-    | l == r = 0
-    | otherwise = 1
-
-class DifferenceRatio a where
-  getDiffRatio :: a -> a -> (Int, Int)
-
-instance DifferenceRatio ASTExpression where
-  getDiffRatio (Const l) (Const r)
-    | l == r = (0, 2)
-    | otherwise = (1, 2)
-  getDiffRatio (Const _) l = (size l, size l)
-  getDiffRatio r (Const _) = (size r, size r)
-  getDiffRatio (Param l) (Param r)
-    | l == r = (0, 2)
-    | otherwise = (1, 2)
-  getDiffRatio (Param _) l = (size l, size l)
-  getDiffRatio r (Param _) = (size r, size r)
-  getDiffRatio (BinOp opl ll lr) (BinOp opr rl rr) =
+-- this function is monotonically decreasing, meaning that if the one of the matched trees
+-- becomes smaller by the smallest possible margin
+-- the matching percentage dips
+instance MatchingRatio ASTExpression where
+  getMatchingRatio (Const l) (Const r)
+    | l == r = (4, 4)
+    | otherwise = (2, 4)
+  getMatchingRatio l (Const _) = (0, size l + 2)
+  getMatchingRatio (Const _) r = (0, size r + 2)
+  getMatchingRatio (Param l) (Param r)
+    | l == r = (4, 4)
+    | otherwise = (2, 4)
+  getMatchingRatio (Param _) l = (0, size l + 2)
+  getMatchingRatio r (Param _) = (0, size r + 2)
+  getMatchingRatio (BinOp opl ll lr) (BinOp opr rl rr) =
     (num, denom)
     where
-      rest = addTuple (getDiffRatio ll rl) (getDiffRatio lr rr)
-      op = getDiffRatio opl opr
+      rest = addTuple (getMatchingRatio ll rl) (getMatchingRatio lr rr)
+      op = getMatchingRatio opl opr
       num = fst rest + fst op
       denom = snd rest + snd op
   -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiffRatio (BinOp _ ll lr) (RelOp _ rl rr) =
-    (num, denom)
+  getMatchingRatio (BinOp _ ll lr) (RelOp _ rl rr) =
+    (fst rest, denom)
     where
-      rest = addTuple (getDiffRatio ll rl) (getDiffRatio lr rr)
-      num = fst rest + 1
+      rest = addTuple (getMatchingRatio ll rl) (getMatchingRatio lr rr)
       denom = snd rest + 1
   -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiffRatio (BinOp _ ll lr) (UnOp _ rl) =
-    (num, denom)
+  getMatchingRatio (BinOp _ ll lr) (UnOp _ rl) =
+    (fst rest, denom)
     where
-      rest = minimum [getDiffRatio ll rl, getDiffRatio lr rl]
-      num = fst rest + 1
+      rest = addTuple (getMatchingRatio ll rl) (getMatchingRatio lr rl)
       denom = snd rest + 1
-  getDiffRatio (RelOp opl ll lr) (RelOp opr rl rr) =
+  getMatchingRatio (RelOp opl ll lr) (RelOp opr rl rr) =
     (num, denom)
     where
-      rest = addTuple (getDiffRatio ll rl) (getDiffRatio lr rr)
-      op = getDiffRatio opl opr
+      rest = addTuple (getMatchingRatio ll rl) (getMatchingRatio lr rr)
+      op = getMatchingRatio opl opr
       num = fst rest + fst op
       denom = snd rest + snd op
   -- + minimum [getDiff ll rl + getDiff lr rr, 1 + getDiff ll rr + getDiff lr rl]
-  getDiffRatio (RelOp opl ll lr) (BinOp opr rl rr) = getDiffRatio (BinOp opr rl rr) (RelOp opl ll lr)
-  getDiffRatio (RelOp _ ll lr) (UnOp _ rl) =
-    (num, denom)
+  getMatchingRatio (RelOp opl ll lr) (BinOp opr rl rr) = getMatchingRatio (BinOp opr rl rr) (RelOp opl ll lr)
+  getMatchingRatio (RelOp _ ll lr) (UnOp _ rl) =
+    (fst rest, denom)
     where
-      rest = minimum [getDiffRatio ll rl, getDiffRatio lr rl]
-      num = fst rest + 1
+      rest = addTuple (getMatchingRatio ll rl) (getMatchingRatio lr rl)
       denom = snd rest + 1
-  getDiffRatio (UnOp opl l) (UnOp opr r) =
+  getMatchingRatio (UnOp opl l) (UnOp opr r) =
     (num, denom)
     where
-      rest = getDiffRatio r l
-      op = getDiffRatio opl opr
+      rest = getMatchingRatio r l
+      op = getMatchingRatio opl opr
       num = fst rest + fst op
       denom = snd rest + snd op
-  getDiffRatio (UnOp opl ll) (BinOp opr rl rr) = getDiffRatio (BinOp opr rl rr) (UnOp opl ll)
-  getDiffRatio (UnOp opl ll) (RelOp opr rl rr) = getDiffRatio (RelOp opr rl rr) (UnOp opl ll)
+  getMatchingRatio (UnOp opl ll) (BinOp opr rl rr) = getMatchingRatio (BinOp opr rl rr) (UnOp opl ll)
+  getMatchingRatio (UnOp opl ll) (RelOp opr rl rr) = getMatchingRatio (RelOp opr rl rr) (UnOp opl ll)
 
-instance DifferenceRatio BinaryOperation where
-  getDiffRatio l r
-    | l == r = (0, 1)
-    | otherwise = (1, 1)
+instance MatchingRatio BinaryOperation where
+  getMatchingRatio l r
+    | l == r = (2, 2)
+    | otherwise = (0, 2)
 
-instance DifferenceRatio UnaryOperation where
-  getDiffRatio l r
-    | l == r = (0, 1)
-    | otherwise = (1, 1)
+instance MatchingRatio UnaryOperation where
+  getMatchingRatio l r
+    | l == r = (2, 2)
+    | otherwise = (0, 2)
 
-instance DifferenceRatio RelationalOperation where
-  getDiffRatio l r
-    | l == r = (0, 1)
-    | otherwise = (1, 1)
+instance MatchingRatio RelationalOperation where
+  getMatchingRatio l r
+    | l == r = (2, 2)
+    | otherwise = (0, 2)
 
 addTuple :: (Int, Int) -> (Int, Int) -> (Int, Int)
 addTuple (ll, lr) (rl, rr) = (ll + rl, lr + rr)
