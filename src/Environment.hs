@@ -68,8 +68,12 @@ showRow ((life, res) : cs) =
     ++ showRow cs
 
 showResources :: [Resource] -> String
-showResources [] = "   "
-showResources _ = "RES"
+showResources l
+  | lenlen < 5 = replicate (5 - lenlen) ' ' ++ len
+  | otherwise = len
+  where
+    len = show $ length l
+    lenlen = length len
 
 -- showResources l = show [round r :: Int | r <- l]
 

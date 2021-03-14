@@ -39,6 +39,7 @@ dependencies:
   - tree-diff
   - cassava
   - vector
+  - split
 
 ghc-options: -Wall
 

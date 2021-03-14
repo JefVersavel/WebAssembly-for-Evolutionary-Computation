@@ -158,6 +158,7 @@ executeCreature :: Creature -> Resource -> IO Creature
 executeCreature creature res = do
   let serialized = bytestring creature
   outcome <- executeModule serialized res
+  putStr $ "executed with outcome " ++ show outcome
   return $ changeRegister creature outcome
 
 mutationChance :: Int
@@ -187,6 +188,8 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate = do
     then do
       print "mutate"
       mutated <- mutateCreature g3 newCreature
+      print "this is the child"
+      putStr $ show mutated
       return
         ( newRest
             ++ [ Runnable creature pos ResourceAquirement Empty,
@@ -195,6 +198,9 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate = do
           insertOrganismAt env mutated childPos
         )
     else do
+      print "don't mutate"
+      print "this is the child"
+      putStr $ show newCreature
       return
         ( newRest
             ++ [ Runnable creature pos ResourceAquirement Empty,
@@ -213,6 +219,7 @@ executeAction ::
   IO ([Runnable Creature], Environment Creature)
 executeAction _ env [] _ _ = return ([], env)
 executeAction gen env runnables@(x : xs) outcome mutationRate = do
+  print outcome
   case toSysCall outcome of
     Reproduction -> do
       print "reproducing"
@@ -244,9 +251,10 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
       print newPos
       return (rest ++ [Runnable creature newPos ResourceAquirement Empty], newEnv)
     Right (crossoverOrg, newPos) -> do
+      putStr $ "the matchin percentage:" ++ show (matchingPercentage (expression crossoverOrg) (expression creature))
       if compatible creature crossoverOrg
         then do
-          print "add crossover here"
+          print "crossing over"
           print pos
           print newPos
           print creature
@@ -256,6 +264,10 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
           let leftExpr = expression creature
               rightExpr = expression crossoverOrg
               (leftChild, rightChild, crossgen) = crossover gen leftExpr rightExpr
+          putStr "leftchild:"
+          putStr $ show leftChild
+          putStr "rightchild:"
+          putStr $ show rightChild
           leftSer <- serializeExpression leftChild 1
           rightSer <- serializeExpression rightChild 1
           (lPos, rPos) <- getChildPositions crossgen env pos newPos
@@ -269,11 +281,6 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
                   (\(Runnable _ p _ _) -> not (p == lPos || p == rPos))
                   rest
                   ++ [Runnable creature pos ResourceAquirement Empty, leftRunnable, rightRunnable]
-          print "these are the new orgs"
-          print leftRunnable
-          print $ expression lft
-          print rightRunnable
-          print $ expression rght
           return (newQueue, newEnv)
         else return (rest ++ [Runnable creature pos ResourceAquirement Empty], env)
 
@@ -349,6 +356,7 @@ run env (RunState iteration runningQueue gen mutationRate) = do
           currentRunnable = head runningQueue
       print "organism:"
       print $ organism currentRunnable
+      putStr $ show (expression $ organism currentRunnable)
       (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate
       let total = Environment.getSize newEnv
           current = length newRunnables
@@ -358,16 +366,12 @@ run env (RunState iteration runningQueue gen mutationRate) = do
           let (g', g'') = split rightGen
           print "killing things"
           kills <- killPositions g' newEnv $ div current 2
-          print "first ok"
           let runnablesAfterKilled =
                 filter
                   (\(Runnable _ pos _ _) -> pos `notElem` kills)
                   newRunnables
-          print "second ok"
-          let newState = RunState newIteration runnablesAfterKilled g'' mutationRate
-          print "third ok"
-          let envAfterKilled = nillify newEnv kills
-          print "fourth ok"
+              newState = RunState newIteration runnablesAfterKilled g'' mutationRate
+              envAfterKilled = nillify newEnv kills
           print envAfterKilled
           restRun <- run envAfterKilled newState
           return $ env : restRun
@@ -407,9 +411,15 @@ performAction gen env (Runnable org pos Execution (Res res) : rest) _ = do
   executedCreature <- executeCreature org res
   let outcome = register executedCreature
       newCreature = grow executedCreature
-  addedEnv <- addResourceToNeighbours gen env pos outcome
-  let addedEnv' = insertOrganismAt addedEnv newCreature pos
-  return (rest ++ [Runnable newCreature pos SystemCall Empty], addedEnv')
+  if isNaN outcome
+    then do
+      -- remove creature if outcome is NaN
+      let removedEnv = nillify env [pos]
+      return (rest, removedEnv)
+    else do
+      addedEnv <- addResourceToNeighbours gen env pos outcome
+      let addedEnv' = insertOrganismAt addedEnv newCreature pos
+      return (rest ++ [Runnable newCreature pos SystemCall Empty], addedEnv')
 performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate = do
   print "doing a system call"
   executeAction gen env runnables (register org) mutationRate
@@ -445,6 +455,7 @@ mainCreature seed start iterations l depth mutationRate divider = do
           ++ show divider
       (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
+  putStr "\n\n"
   print name
   env <- initEnvironment g1 Moore lim start depth divider
   print "Init"
