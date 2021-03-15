@@ -64,7 +64,8 @@ generateFunction m params e = do
 -- and adding that function to the default binaryen module,
 createModule :: ASTExpression -> Int -> IO Module
 createModule e params = do
-  (first, second, third) <- generateGlobalNames params
+  parameters <- generateGlobalNames params
+  let (first, second, third) = head parameters
   m <- create
   function <- generateFunction m [first] e
   functionName <- getName function
@@ -75,12 +76,18 @@ createModule e params = do
   return m
 
 -- | Generates the names for the global variables.
-generateGlobalNames :: Int -> IO (CString, CString, CString)
-generateGlobalNames n = do
+generateGlobalNames :: Int -> IO [(CString, CString, CString)]
+generateGlobalNames n = sequence [generateGlobalName i | i <- [0 .. (n -1)]]
+
+generateGlobalName :: Int -> IO (CString, CString, CString)
+generateGlobalName n = do
   pool <- newPool
-  first <- pooledNewByteString0 pool "internalName"
-  second <- pooledNewByteString0 pool "externalModuleName"
-  third <- pooledNewByteString0 pool "externalName"
+  let internalName = encode ("internalName" ++ show n :: String)
+  let externalModuleName = encode ("externalModuleName" ++ show n :: String)
+  let externalName = encode ("externalName" ++ show n :: String)
+  first <- pooledNewByteString0 pool internalName
+  second <- pooledNewByteString0 pool externalModuleName
+  third <- pooledNewByteString0 pool externalName
   return (first, second, third)
 
 -- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.
