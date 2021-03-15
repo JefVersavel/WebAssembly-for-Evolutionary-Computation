@@ -6,25 +6,23 @@
 
 module ExecuteWasm where
 
-import Control.Exception
 import Data.Aeson as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Data.Serialize
 import GHC.Generics
 import Language.JavaScript.Inline
 
 executeModule :: BS.ByteString -> [Double] -> Double -> IO (Maybe Output)
-executeModule bytes params internal =
+executeModule bytes params int =
   withSession defaultConfig $ \session -> do
     let val1 = Aeson $ head params
     let val2 = Aeson $ params !! 1
     let val3 = Aeson $ params !! 2
     let val4 = Aeson $ params !! 3
     let val5 = Aeson $ last params
-    let internalValue = Aeson internal
+    let internalValue = Aeson int
     let program = LBS.fromStrict bytes
-    (json :: EncodedJSON) <-
+    (jsn :: EncodedJSON) <-
       eval
         session
         [js|
@@ -68,8 +66,7 @@ executeModule bytes params internal =
     return 65468151541;
   });
   |]
-    print json
-    return (A.decode $ unEncodedJSON json :: Maybe Output)
+    return (A.decode $ unEncodedJSON jsn :: Maybe Output)
 
 data Output = Output {outcome :: Double, internal :: Double}
   deriving (Show, Generic)

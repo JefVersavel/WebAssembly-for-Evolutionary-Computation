@@ -65,6 +65,7 @@ createModule :: ASTExpression -> Int -> IO Module
 createModule e params
   | params > 5 = error "currently a maximum of 5 parameters is allowed"
   | otherwise = do
+    print params
     parameters <- generateGlobalNames params
     print ("parameters" :: String)
     print parameters
