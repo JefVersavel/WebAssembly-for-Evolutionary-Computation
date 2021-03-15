@@ -10,7 +10,7 @@ import Binaryen.Module
   ( Module,
     addFunction,
     addFunctionExport,
-    addGlobal,
+    addGlobalExport,
     addGlobalImport,
     create,
   )
@@ -19,7 +19,6 @@ import Binaryen.Type (float64, none)
 import BinaryenTranslation
 import BinaryenUtils
 import Data.ByteString as BS (ByteString, writeFile)
-import Data.Serialize
 import Foreign
 import Foreign.C.String
 import Foreign.C.Types
@@ -63,18 +62,28 @@ generateFunction m params e = do
 -- | Generates a binaryen module from an ASTExpression by generating a binaryen function wiht that ASTExpression
 -- and adding that function to the default binaryen module,
 createModule :: ASTExpression -> Int -> IO Module
-createModule e params = do
-  parameters <- generateGlobalNames params
-  let (first, second, third) = head parameters
-  m <- create
-  let firsts = [first | (first, _, _) <- parameters]
-  function <- generateFunction m firsts e
-  functionName <- getName function
-  _ <- addFunctionExport m functionName functionName
-  print m
-  addGlobalImport m first second third float64 0
-  print m
-  return m
+createModule e params
+  | params > 5 = error "currently a maximum of 5 parameters is allowed"
+  | otherwise = do
+    parameters <- generateGlobalNames params
+    print ("parameters" :: String)
+    print parameters
+    m <- create
+    let firsts = [first | (first, _, _) <- parameters]
+    function <- generateFunction m firsts e
+    functionName <- getName function
+    _ <- addFunctionExport m functionName functionName
+    print m
+    let zipped = zip ([0, 1 ..] :: [CInt]) parameters
+    (fInternal, sInternal, tInternal) <- getInternalNames
+    addGlobalImport m fInternal sInternal tInternal float64 5
+    _ <- addGlobalExport m fInternal tInternal
+    mapM_ (addglobal m) zipped
+    print m
+    return m
+
+addglobal :: Module -> (CInt, (CString, CString, CString)) -> IO ()
+addglobal m (i, (f, s, t)) = addGlobalImport m f s t float64 i
 
 -- | Generates the names for the global variables.
 generateGlobalNames :: Int -> IO [(CString, CString, CString)]
@@ -82,13 +91,17 @@ generateGlobalNames n = sequence [generateGlobalName i | i <- [0 .. (n -1)]]
 
 generateGlobalName :: Int -> IO (CString, CString, CString)
 generateGlobalName n = do
-  pool <- newPool
-  let internalName = encode ("internalName" ++ show n :: String)
-  let externalModuleName = encode ("externalModuleName" ++ show n :: String)
-  let externalName = encode ("externalName" ++ show n :: String)
-  first <- pooledNewByteString0 pool internalName
-  second <- pooledNewByteString0 pool externalModuleName
-  third <- pooledNewByteString0 pool externalName
+  first <- newCString $ "param" ++ show n
+  second <- newCString "external"
+  third <- newCString $ "param" ++ show n
+  return (first, second, third)
+
+-- returns the names of the internal state
+getInternalNames :: IO (CString, CString, CString)
+getInternalNames = do
+  first <- newCString "state"
+  second <- newCString "internal"
+  third <- newCString "state"
   return (first, second, third)
 
 -- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.

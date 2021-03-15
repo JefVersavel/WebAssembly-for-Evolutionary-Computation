@@ -157,9 +157,12 @@ mutateCreature gen creature = do
 executeCreature :: Creature -> Resource -> IO Creature
 executeCreature creature res = do
   let serialized = bytestring creature
-  outcome <- executeModule serialized res
-  putStr $ "executed with outcome " ++ show outcome
-  return $ changeRegister creature outcome
+  output <- executeModule serialized [res] 0
+  case output of
+    Just out -> do
+      putStr $ "executed with outcome " ++ show (outcome out)
+      return $ changeRegister creature $ outcome out
+    Nothing -> error "execution has failed"
 
 mutationChance :: Int
 mutationChance = 4
