@@ -67,7 +67,8 @@ createModule e params = do
   parameters <- generateGlobalNames params
   let (first, second, third) = head parameters
   m <- create
-  function <- generateFunction m [first] e
+  let firsts = [first | (first, _, _) <- parameters]
+  function <- generateFunction m firsts e
   functionName <- getName function
   _ <- addFunctionExport m functionName functionName
   print m
@@ -139,6 +140,6 @@ removeAllFiles = foldr ((>>) . removeFile) (return ())
 
 test :: IO [(ASTExpression, String)]
 test = do
-  let params = 1
+  let params = 5
   exprs <- genASTExpressions 10 1 params 0.5 6
   createWasmFiles exprs params
