@@ -2,29 +2,28 @@ module StackExpressions where
 
 import AST
 import Generators
+import Options.Applicative.Help.Levenshtein
 
 data StackInstruction
   = B BinaryOperation
   | U UnaryOperation
   | R RelationalOperation
   | C Double
-  | Cnst
   | P Int
-  | Prm
   | GSet
   | GGet
+  | GTee
   deriving (Eq)
 
 instance Show StackInstruction where
   show (B b) = show b
   show (U u) = show u
   show (R r) = show r
-  show (C d) = " " ++ show d
-  show (P p) = " " ++ show p
-  show Cnst = " Const"
-  show Prm = " Param"
+  show (C d) = " const " ++ show d
+  show (P p) = " param " ++ show p
   show GSet = " global.set"
   show GGet = " global.get"
+  show GTee = " global.tee"
 
 class ToStack a where
   toStack :: a -> InstructionSequence
@@ -35,12 +34,12 @@ newtype InstructionSequence = Seq [StackInstruction]
 (Seq l) +++ (Seq r) = Seq $ l ++ r
 
 instance ToStack ASTExpression where
-  toStack (Const c) = Seq [C c, Cnst]
-  toStack (Param p) = Seq [P p, Prm]
+  toStack (Const c) = Seq [C c]
+  toStack (Param p) = Seq [P p]
   toStack (BinOp b l r) = toStack r +++ toStack l +++ Seq [B b]
   toStack (UnOp u e) = toStack e +++ Seq [U u]
   toStack (RelOp b r l) = toStack r +++ toStack l +++ Seq [R b]
-  toStack (GlobalTee l) = toStack l +++ Seq [GSet, GGet]
+  toStack (GlobalTee l) = toStack l +++ Seq [GTee]
   toStack (GlobalSet l r) = toStack l +++ Seq [GSet] +++ toStack r
   toStack GlobalGet = Seq [GGet]
 
@@ -50,9 +49,15 @@ instance Show InstructionSequence where
 
 stacktest = do
   expr <- randomGenerationTest
-  print $ expr !! 7
   let first = expr !! 7
-  putStr $ show $ toStack first
+  print first
+  let (Seq fStack) = toStack first
+  putStr $ show fStack
+  let second = expr !! 5
+  print second
+  let (Seq sStack) = toStack second
+  putStr $ show sStack
+  print $ editDistance fStack sStack
 
 -- https://wiki.haskell.org/Edit_distance
 dist :: Eq a => [a] -> [a] -> Int
