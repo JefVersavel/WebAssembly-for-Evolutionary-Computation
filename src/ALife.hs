@@ -36,7 +36,8 @@ data Creature = Creature
   { expression :: ASTExpression, -- The expression that represents the program of the creature.
     register :: Double, -- Stores the value of the register that contains the state of the creature.
     bytestring :: BS.ByteString,
-    age :: Int
+    age :: Int,
+    internalState :: Double
   }
   deriving (Eq, Generic)
 
@@ -57,6 +58,8 @@ instance Organism Creature where
           ++ show (getMaxDepth $ expression creature)
           ++ "_"
           ++ show (age creature)
+          ++ "_"
+          ++ show (internalState creature)
       extra = 16 - length str
       newStr = str ++ replicate extra ' '
   executable creature = age creature > 1
@@ -66,8 +69,15 @@ instance Organism Creature where
       double = (fromIntegral (numerator match) :: Double) / (fromIntegral (denominator match) :: Double)
 
 instance Show Creature where
-  show (Creature e r _ a) =
-    show (Rep.generateRepresentation e) ++ ", register= " ++ show r ++ ", age= " ++ show a ++ "\n"
+  show (Creature e r _ a s) =
+    show (Rep.generateRepresentation e)
+      ++ ", register= "
+      ++ show r
+      ++ ", age= "
+      ++ show a
+      ++ ", state= "
+      ++ show s
+      ++ "\n"
 
 type GenotypePop = [(String, Int)]
 
@@ -89,15 +99,18 @@ envToLists env = map (map (Bi.first genotype')) (toLists $ grid env)
 
 -- | Ages the creature by one.
 grow :: Creature -> Creature
-grow (Creature e r b a) = Creature e r b $ a + 1
+grow (Creature e r b a s) = Creature e r b (a + 1) s
 
 -- | Returns the same creature but with age 0
 reborn :: Creature -> Creature
-reborn (Creature e r b _) = Creature e r b 0
+reborn (Creature e r b _ s) = Creature e r b 0 s
 
 -- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e _ b a) r = Creature e r b a
+changeRegister (Creature e _ b a s) r = Creature e r b a s
+
+changeState :: Creature -> Double -> Creature
+changeState (Creature e r b a _) = Creature e r b a
 
 -- | Generates an initial population of creatures with and a bound for the initial i
 -- value of the registers of the creatures and the limits of the environment.
@@ -113,7 +126,7 @@ generateInitPop gen start depth lim divider nrParam = do
       ex <- sequence [generate g | g <- rampedHalfNHalf g1 depth nrParam 0.5 s]
       let starts = generateStart g2 s start
       serializeds <- serializeExpressions ex nrParam
-      return [Creature e st b 0 | ((e, st), b) <- zip (zip ex starts) (map snd serializeds)]
+      return [Creature e st b 0 0 | ((e, st), b) <- zip (zip ex starts) (map snd serializeds)]
 
 -- | Generates a list of random values for the registers of the creatures
 -- with a given bound and size of that list.
@@ -134,7 +147,7 @@ mutateCreature gen creature nrParam = do
   let r = register creature
   e <- subTreeMutation gen (expression creature) nrParam
   serialized <- serializeExpression e nrParam
-  return $ Creature e r serialized (age creature)
+  return $ Creature e r serialized (age creature) (internalState creature)
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> [Resource] -> IO Creature
@@ -144,14 +157,13 @@ executeCreature creature res = do
       zipped = zip params res
       fullRes = distributeParams (replicate 5 (1 / 0)) zipped
   print "these are the parametes"
-  print params
-  print zipped
   print fullRes
-  output <- executeModule serialized fullRes 0
+  output <- executeModule serialized fullRes $ internalState creature
   case output of
     Just out -> do
-      putStr $ "executed with outcome " ++ show (outcome out)
-      return $ changeRegister creature $ outcome out
+      print $ "executed with outcome " ++ show (outcome out)
+      print $ "and with new state " ++ show (internal out)
+      return $ changeState (changeRegister creature $ outcome out) $ internal out
     Nothing -> error "execution has failed"
 
 mutationChance :: Int
@@ -252,7 +264,9 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
       print newPos
       return (rest ++ [Runnable creature newPos ResourceAquirement []], newEnv)
     Right (crossoverOrg, newPos) -> do
-      putStr $ "the matchin percentage:" ++ show (matchingPercentage (expression crossoverOrg) (expression creature))
+      putStr $
+        "the matchin percentage:"
+          ++ show (matchingPercentage (expression crossoverOrg) (expression creature))
       if compatible creature crossoverOrg
         then do
           print "crossing over"
@@ -272,8 +286,8 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
           leftSer <- serializeExpression leftChild 1
           rightSer <- serializeExpression rightChild 1
           (lPos, rPos) <- getChildPositions crossgen env pos newPos
-          let lft = Creature leftChild (register creature) leftSer 0
-              rght = Creature rightChild (register crossoverOrg) rightSer 0
+          let lft = Creature leftChild (register creature) leftSer 0 0
+              rght = Creature rightChild (register crossoverOrg) rightSer 0 0
               newEnv = insertOrganismAt (insertOrganismAt env lft lPos) rght rPos
               leftRunnable = Runnable lft lPos ResourceAquirement []
               rightRunnable = Runnable lft rPos ResourceAquirement []
