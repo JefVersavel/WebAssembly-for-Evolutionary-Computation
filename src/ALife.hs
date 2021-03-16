@@ -142,7 +142,10 @@ executeCreature creature res = do
   let serialized = bytestring creature
       params = List.sort $ getParameters $ expression creature
       zipped = zip params res
-      fullRes = distributeParams (replicate 5 0) zipped
+      fullRes = distributeParams (replicate 5 (1 / 0)) zipped
+  print "these are the parametes"
+  print params
+  print zipped
   print fullRes
   output <- executeModule serialized fullRes 0
   case output of
@@ -156,11 +159,9 @@ mutationChance = 4
 
 distributeParams :: [Double] -> [(Int, Double)] -> [Double]
 distributeParams list [] = list
-distributeParams list ((i, d) : rest) = distributeParams (getInit f ++ [d] ++ l) rest
+distributeParams list ((i, d) : rest) = distributeParams (f ++ [d] ++ tail l) rest
   where
     (f, l) = splitAt i list
-    getInit [] = []
-    getInit lst = init lst
 
 -- | Reproduces the creaturs in the environment if the are able to reproduce.
 -- It also is possible by chance that the reproduced creature is mutated.
@@ -392,6 +393,7 @@ performAction ::
 performAction _ env [] _ _ = return ([], env)
 performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
   print "trying to aquire resources"
+  print $ unsafeGetResources env pos
   if hasResources env pos
     then do
       let nrParamsNeeded = length (getParameters $ expression org) - length res
@@ -410,9 +412,9 @@ performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
     else do
       print "no resource found"
       return (rest ++ [Runnable org pos ResourceAquirement res], env)
-performAction _ env (Runnable org pos Execution [] : rest) _ _ = do
-  print "execution without resources is not possible"
-  return (rest ++ [Runnable org pos ResourceAquirement []], env)
+-- performAction _ env (Runnable org pos Execution [] : rest) _ _ = do
+--   print "execution without resources is not possible"
+--   return (rest ++ [Runnable org pos ResourceAquirement []], env)
 performAction gen env (Runnable org pos Execution res : rest) _ _ = do
   print "execution"
   print $ expression org
