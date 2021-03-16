@@ -29,7 +29,7 @@ instance ToRecord TestData
 executeTestdata :: [TestData] -> IO ()
 executeTestdata [] = return ()
 executeTestdata (TestData se st it li de mu di : rest) = do
-  mainCreature se st it li de mu di
+  mainCreature se st it li de mu di 1
   executeTestdata rest
 
 runMultipleFiles :: [FilePath] -> IO ()

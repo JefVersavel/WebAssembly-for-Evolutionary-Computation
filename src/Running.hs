@@ -10,8 +10,7 @@ import Test.QuickCheck.Random
 data Action = ResourceAquirement | Execution | SystemCall
   deriving (Show)
 
-data Storage = Res Resource | Empty
-  deriving (Show)
+type Storage = [Resource]
 
 -- | Representation of an organims that is currently part of the running queue
 data Runnable a = Organism a =>
@@ -34,7 +33,7 @@ instance Show (Runnable a) where
       ++ "\n"
 
 -- | Represents that state that is kept during the running of a simulation
-data RunState a = Organism a => RunState Int [Runnable a] QCGen Int
+data RunState a = Organism a => RunState Int [Runnable a] QCGen Int Int
 
 -- | Sets the action of the runnable to the given action.
 setAction :: Runnable a -> Action -> Runnable a
@@ -47,11 +46,12 @@ setPosition (Runnable org _ act stor) pos = Runnable org pos act stor
 -- | Adds a resource to the runnable.
 -- If there was already a resource in the runnable that resource is overwritten.
 addResource :: Runnable a -> Resource -> Runnable a
-addResource (Runnable org pos act _) res = Runnable org pos act $ Res res
+addResource (Runnable org pos act old) res =
+  Runnable org pos act (res : old)
 
 -- | Empties the storage of the runnable.
 emptyStorage :: Runnable a -> Runnable a
-emptyStorage (Runnable org pos act _) = Runnable org pos act Empty
+emptyStorage (Runnable org pos act _) = Runnable org pos act []
 
 -- | Returns the next action based on a boolean.
 nextAction :: Action -> Action

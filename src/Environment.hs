@@ -207,8 +207,14 @@ unsafeGetResources env pos = case getResourcesAt env pos of
   Just r -> r
 
 -- | Returns a random resource at the given position.
-unsafeGetRandomResource :: Environment a -> QCGen -> Pos -> IO Resource
-unsafeGetRandomResource env gen pos = QC.generate $ useSeed gen $ QC.elements $ unsafeGetResources env pos
+unsafeGetRandomResource :: Environment a -> QCGen -> Pos -> Int -> [Resource]
+unsafeGetRandomResource env gen pos amount = [ress !! i | i <- indices]
+  where
+    ress = unsafeGetResources env pos
+    len = length ress
+    indices
+      | length ress >= amount = take amount $ List.nub $ R.randomRs (0, len - 1) gen
+      | otherwise = take len $ List.nub $ R.randomRs (0, len - 1) gen
 
 -- | Inserts the given resources the given position in the environmnet.
 insertResourcesAt :: Organism a => Environment a -> [Resource] -> Pos -> Environment a
@@ -247,13 +253,17 @@ addResource env pos d =
     res = getResourcesAt env pos
 
 -- | Delete the given resource from the list of resources on the given position.
-deleteSubResources :: Organism a => Environment a -> Pos -> Resource -> Environment a
-deleteSubResources env pos d =
+deleteSubResource :: Organism a => Environment a -> Pos -> Resource -> Environment a
+deleteSubResource env pos d =
   case res of
     Nothing -> env
     Just r -> insertResourcesAt env (List.delete d r) pos
   where
     res = getResourcesAt env pos
+
+deleteSubResources :: Organism a => Environment a -> Pos -> [Resource] -> Environment a
+deleteSubResources env _ [] = env
+deleteSubResources env pos (x : xs) = deleteSubResources (deleteSubResource env pos x) pos xs
 
 -- | Fills in the given list of tuples with positions and resources into the environmnet.
 fillInResources :: Organism a => Environment a -> [(Pos, [Resource])] -> Environment a

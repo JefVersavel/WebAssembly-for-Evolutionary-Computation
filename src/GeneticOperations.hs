@@ -171,23 +171,6 @@ switch g (l, r)
   where
     i = fst $ randomR (0, 1) g :: Int
 
--- | Performs editing which is achieved by executing the expression at a randomly chosen node and replacing it in the original expression by its return value.
-editing :: QCGen -> ASTExpression -> [Double] -> IO ASTExpression
-editing g e params = do
-  let (point, _) = selectGenOpPoint g e
-  let subTree = getSubExpression point e
-  result <- executeSubTree subTree params
-  return $ insertSubExpression point e (Const result)
-
--- | Executes an expression and returns its return value.
-executeSubTree :: ASTExpression -> [Double] -> IO Double
-executeSubTree e params = do
-  serialized <- serializeExpression e $ length params
-  executeModule serialized $ head params
-
 testExpression :: ASTExpression
 testExpression =
   BinOp Mul (UnOp Floor (Const 4)) (BinOp Add (Const 34) (UnOp Ceil (Param 4)))
-
-testGen :: IO ASTExpression
-testGen = editing (mkQCGen 9) testExpression [0, 1, 2, 3, 4]

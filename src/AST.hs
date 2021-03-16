@@ -5,6 +5,7 @@ module AST where
 import Binaryen.Op
 import BinaryenTranslation
 import Data.Aeson
+import Data.List
 import Data.Serialize
 import Data.TreeDiff
 import GHC.Generics
@@ -184,6 +185,13 @@ getNrNodes' (Param _) = 2
 getNrNodes' (UnOp _ e) = 1 + getNrNodes e
 getNrNodes' (BinOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
 getNrNodes' (RelOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
+
+getParameters :: ASTExpression -> [Int]
+getParameters (Const _) = []
+getParameters (Param i) = [i]
+getParameters (UnOp _ e) = nub $ getParameters e
+getParameters (BinOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
+getParameters (RelOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
 
 -- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int
