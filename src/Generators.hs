@@ -62,6 +62,10 @@ rConst = Const <$> arbitrary
 rParam :: NrParam -> Gen ASTExpression
 rParam m = Param <$> elements [0, 1 .. (m - 1)]
 
+-- | generator for a globaltee expression
+rGlobalTee :: Gen ASTExpression -> Gen ASTExpression
+rGlobalTee gExpr = GlobalTee <$> gExpr
+
 -- | GROW algorithm that builds a generator for an ASTExpression.
 -- As long as the depth is shorter than the given maximum depth all possible nodes can be chosen.
 -- Once the given maximum epth is reached only leaf nodes an be chosen such as a constant or a parameter.
@@ -79,7 +83,8 @@ growOne d = do
             (1, rParam nrParam),
             (length [minBound :: BinaryOperation ..], rBinExpr g1 g2),
             (length [minBound :: UnaryOperation ..], rUnExpr g1),
-            (length [minBound :: RelationalOperation ..], rRelExpr g1 g2)
+            (length [minBound :: RelationalOperation ..], rRelExpr g1 g2),
+            (1, rGlobalTee g1)
           ]
     else return $ oneof [rConst, rParam nrParam]
 
@@ -105,7 +110,8 @@ fullOne d = do
         frequency
           [ (length [minBound :: BinaryOperation ..], rBinExpr f1 f2),
             (length [minBound :: UnaryOperation ..], rUnExpr f1),
-            (length [minBound :: RelationalOperation ..], rRelExpr f1 f2)
+            (length [minBound :: RelationalOperation ..], rRelExpr f1 f2),
+            (1, rGlobalTee f1)
           ]
     else return $ oneof [rConst, rParam nrParam]
 
@@ -139,4 +145,4 @@ genASTExpressions seed d nrParam ratio n = do
   sequence
     [generate g | g <- rampedHalfNHalf (mkQCGen seed) d nrParam ratio n]
 
-randomGenerationTest = genASTExpressions 12 10 1 0.5 2
+randomGenerationTest = genASTExpressions 12 6 1 0.5 10
