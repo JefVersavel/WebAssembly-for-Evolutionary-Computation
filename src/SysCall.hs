@@ -1,5 +1,11 @@
 module SysCall where
 
+import AST
+import Seeding
+import System.Random
+import Test.QuickCheck
+import Test.QuickCheck.Random
+
 -- | Represents the call that an organism can make to the host.
 -- The calls are then performed by the host.
 data SysCall
@@ -16,3 +22,14 @@ toSysCall :: Double -> SysCall
 toSysCall n = toEnum (round (abs n) `rem` s)
   where
     s = length [minBound :: SysCall .. maxBound]
+
+decideSysCall :: Double -> ASTExpression -> IO SysCall
+decideSysCall n expr =
+  generate $
+    useSeed gen $
+      frequency
+        [(dpth, return Reproduction), (sze, elements [Up, Down, Rght, Lft]), (sze - dpth, return None)]
+  where
+    gen = mkQCGen $ round n
+    dpth = getMaxDepth expr
+    sze = size expr

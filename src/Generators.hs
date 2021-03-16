@@ -84,7 +84,7 @@ growOne d = do
             (length [minBound :: BinaryOperation ..], rBinExpr g1 g2),
             (length [minBound :: UnaryOperation ..], rUnExpr g1),
             (length [minBound :: RelationalOperation ..], rRelExpr g1 g2),
-            (1, rGlobalTee g1)
+            (10, rGlobalTee g1)
           ]
     else return $ oneof [rConst, rParam nrParam]
 
@@ -111,7 +111,7 @@ fullOne d = do
           [ (length [minBound :: BinaryOperation ..], rBinExpr f1 f2),
             (length [minBound :: UnaryOperation ..], rUnExpr f1),
             (length [minBound :: RelationalOperation ..], rRelExpr f1 f2),
-            (1, rGlobalTee f1)
+            (10, rGlobalTee f1)
           ]
     else return $ oneof [rConst, rParam nrParam]
 

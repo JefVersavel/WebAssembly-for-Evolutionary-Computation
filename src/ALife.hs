@@ -233,7 +233,8 @@ executeAction ::
 executeAction _ env [] _ _ _ = return ([], env)
 executeAction gen env runnables@(x : xs) out mutationRate nrParam = do
   print out
-  case toSysCall out of
+  syscall <- decideSysCall out (expression $ organism x)
+  case syscall of
     Reproduction -> do
       print "reproducing"
       reproduce gen env runnables mutationRate nrParam
@@ -492,4 +493,4 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 2 10 1000 5 6 4 10 5
+  mainCreature 10 10 1000 5 6 4 10 2
