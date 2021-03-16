@@ -36,6 +36,9 @@ instance MatchingRatio ASTExpression where
     | otherwise = (2, 4)
   getMatchingRatio (Param _) l = (0, size l + 2)
   getMatchingRatio r (Param _) = (0, size r + 2)
+  getMatchingRatio GlobalGet GlobalGet = (0, 2)
+  getMatchingRatio GlobalGet l = (0, size l + 2)
+  getMatchingRatio r GlobalGet = (0, size r + 2)
   getMatchingRatio (BinOp opl ll lr) (BinOp opr rl rr) =
     (num, denom)
     where
@@ -76,6 +79,10 @@ instance MatchingRatio ASTExpression where
       op = getMatchingRatio opl opr
       num = fst rest + fst op
       denom = snd rest + snd op
+  getMatchingRatio (GlobalTee l) (GlobalTee r) =
+    (fst rest + 1, snd rest + 1)
+    where
+      rest = getMatchingRatio l r
   getMatchingRatio (UnOp opl ll) (BinOp opr rl rr) = getMatchingRatio (BinOp opr rl rr) (UnOp opl ll)
   getMatchingRatio (UnOp opl ll) (RelOp opr rl rr) = getMatchingRatio (RelOp opr rl rr) (UnOp opl ll)
 

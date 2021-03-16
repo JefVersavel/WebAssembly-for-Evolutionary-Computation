@@ -50,6 +50,16 @@ generateExpression m names (GlobalTee e) = do
   glblget <- globalGet m internal float64
   exprPtr <- newArray [glblset, glblget]
   block m nullPtr exprPtr 2 float64
+generateExpression m _ GlobalGet = do
+  (internal, _, _) <- getInternalNames
+  globalGet m internal float64
+generateExpression m names (GlobalSet e1 e2) = do
+  ge1 <- generateExpression m names e1
+  ge2 <- generateExpression m names e2
+  (internal, _, _) <- getInternalNames
+  glblset <- globalSet m internal ge1
+  exprPtr <- newArray [glblset, ge2]
+  block m nullPtr exprPtr 2 float64
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
 generateExpressions :: [Module] -> [CString] -> IO [Expression]
@@ -160,6 +170,6 @@ removeAllFiles = foldr ((>>) . removeFile) (return ())
 test :: IO [(ASTExpression, String)]
 test = do
   let params = 5
-  exprs <- genASTExpressions 10 6 params 0.5 6
+  exprs <- genASTExpressions 10 10 params 0.5 6
   print exprs
   createWasmFiles exprs params

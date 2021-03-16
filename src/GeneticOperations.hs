@@ -27,6 +27,13 @@ getSubExpression i (RelOp _ e1 e2)
     nrNodes1 = getNrNodes e1
     dec = i - 1
 getSubExpression i (GlobalTee e) = getSubExpression (i - 1) e
+getSubExpression _ GlobalGet = GlobalGet
+getSubExpression i (GlobalSet e1 e2)
+  | i <= nrNodes1 = getSubExpression dec e1
+  | otherwise = getSubExpression (dec - nrNodes1) e2
+  where
+    nrNodes1 = getNrNodes e1
+    dec = i - 1
 
 -- | Inserts an expression into another expression at the givin place.
 insertSubExpression :: Int -> ASTExpression -> ASTExpression -> ASTExpression
@@ -49,6 +56,13 @@ insertSubExpression i (RelOp o e1 e2) e3
     dec = i - 1
 insertSubExpression i (GlobalTee e1) e2 =
   GlobalTee $ insertSubExpression (i - 1) e1 e2
+insertSubExpression _ GlobalGet e = e
+insertSubExpression i (GlobalSet e1 e2) e3
+  | i <= nrNodes1 = GlobalSet (insertSubExpression dec e1 e3) e2
+  | otherwise = GlobalSet e1 (insertSubExpression (dec - nrNodes1) e2 e3)
+  where
+    nrNodes1 = getNrNodes e1
+    dec = i - 1
 
 -- | Returns a tuple of a randomly generated place and the next generator.
 selectGenOpPoint :: RandomGen g => g -> ASTExpression -> (Int, g)
@@ -108,7 +122,7 @@ replaceNode unOp binOp leaf i (RelOp o e1 e2)
   where
     nrNodes1 = getNrNodes e1
     dec = i - 1
-replaceNode _ _ _ _ (GlobalTee e) = GlobalTee e
+replaceNode _ _ _ _ node = node
 
 -- | Performs point-mutation which is achieved by randomly replacing one node in the expression.
 pointMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
@@ -165,6 +179,10 @@ permute g (RelOp o e1 e2) = RelOp o e11 e22
   where
     (e11, e22) = switch g (e1, e2)
 permute _ (GlobalTee e) = GlobalTee e
+permute _ GlobalGet = GlobalGet
+permute g (GlobalSet e1 e2) = GlobalSet e11 e22
+  where
+    (e11, e22) = switch g (e1, e2)
 
 -- | Randomly switches the elements in a tuple based on a random number generator that either returns 0 or 1.
 switch :: RandomGen g => g -> (a, a) -> (a, a)
