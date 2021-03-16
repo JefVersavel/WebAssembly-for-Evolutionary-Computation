@@ -3,7 +3,7 @@
 module WasmGenerator where
 
 import AST
-import Binaryen.Expression (Expression, binary, constFloat64, globalGet, unary)
+import Binaryen.Expression (Expression, binary, block, constFloat64, globalGet, globalSet, unary)
 import Binaryen.Function (Function, getName)
 import Binaryen.Index (Index (Index))
 import Binaryen.Module
@@ -43,6 +43,13 @@ generateExpression m names (RelOp op e1 e2) = do
   ge2 <- generateExpression m names e2
   be <- binary m (translateOp op) ge1 ge2
   unary m convertUInt32ToFloat64 be
+generateExpression m names (GlobalTee e) = do
+  ge <- generateExpression m names e
+  (internal, _, _) <- getInternalNames
+  glblset <- globalSet m internal ge
+  glblget <- globalGet m internal float64
+  exprPtr <- newArray [glblset, glblget]
+  block m nullPtr exprPtr 2 float64
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
 generateExpressions :: [Module] -> [CString] -> IO [Expression]
@@ -74,13 +81,11 @@ createModule e params
     function <- generateFunction m firsts e
     functionName <- getName function
     _ <- addFunctionExport m functionName functionName
-    print m
     let zipped = zip ([0, 1 ..] :: [CInt]) parameters
     (fInternal, sInternal, tInternal) <- getInternalNames
     addGlobalImport m fInternal sInternal tInternal float64 5
     _ <- addGlobalExport m fInternal tInternal
     mapM_ (addglobal m) zipped
-    print m
     return m
 
 addglobal :: Module -> (CInt, (CString, CString, CString)) -> IO ()
@@ -155,5 +160,6 @@ removeAllFiles = foldr ((>>) . removeFile) (return ())
 test :: IO [(ASTExpression, String)]
 test = do
   let params = 5
-  exprs <- genASTExpressions 10 1 params 0.5 6
+  exprs <- genASTExpressions 10 6 params 0.5 6
+  print exprs
   createWasmFiles exprs params

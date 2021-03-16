@@ -2,13 +2,11 @@ module GeneticOperations where
 
 import AST
 import Control.Monad.Reader
-import ExecuteWasm
 import Generators
 import Seeding
 import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.Random
-import WasmGenerator
 
 -- | Returns the sub-expression of a given expression at the given place.
 getSubExpression :: Int -> ASTExpression -> ASTExpression
@@ -28,6 +26,7 @@ getSubExpression i (RelOp _ e1 e2)
   where
     nrNodes1 = getNrNodes e1
     dec = i - 1
+getSubExpression i (GlobalTee e) = getSubExpression (i - 1) e
 
 -- | Inserts an expression into another expression at the givin place.
 insertSubExpression :: Int -> ASTExpression -> ASTExpression -> ASTExpression
@@ -48,6 +47,8 @@ insertSubExpression i (RelOp o e1 e2) e3
   where
     nrNodes1 = getNrNodes e1
     dec = i - 1
+insertSubExpression i (GlobalTee e1) e2 =
+  GlobalTee $ insertSubExpression (i - 1) e1 e2
 
 -- | Returns a tuple of a randomly generated place and the next generator.
 selectGenOpPoint :: RandomGen g => g -> ASTExpression -> (Int, g)
@@ -107,6 +108,7 @@ replaceNode unOp binOp leaf i (RelOp o e1 e2)
   where
     nrNodes1 = getNrNodes e1
     dec = i - 1
+replaceNode _ _ _ _ (GlobalTee e) = GlobalTee e
 
 -- | Performs point-mutation which is achieved by randomly replacing one node in the expression.
 pointMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
@@ -162,6 +164,7 @@ permute g (BinOp o e1 e2) = BinOp o e11 e22
 permute g (RelOp o e1 e2) = RelOp o e11 e22
   where
     (e11, e22) = switch g (e1, e2)
+permute _ (GlobalTee e) = GlobalTee e
 
 -- | Randomly switches the elements in a tuple based on a random number generator that either returns 0 or 1.
 switch :: RandomGen g => g -> (a, a) -> (a, a)

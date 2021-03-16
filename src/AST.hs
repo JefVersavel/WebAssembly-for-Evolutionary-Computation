@@ -25,6 +25,9 @@ data ASTExpression
     UnOp UnaryOperation ASTExpression
   | -- | Non-leaf node in an AST that represents a relational operator and thus has two sub-expressions.
     RelOp RelationalOperation ASTExpression ASTExpression
+  | -- | this is a block expression which acts the same as local.tee but for globals. it changes the internal
+    -- | state of the organism
+    GlobalTee ASTExpression
   deriving (Generic)
 
 instance ToExpr ASTExpression
@@ -71,6 +74,7 @@ smallShow (Param d) = "Param" ++ show d
 smallShow (BinOp b _ _) = show b
 smallShow (UnOp u _) = show u
 smallShow (RelOp r _ _) = show r
+smallShow (GlobalTee _) = "global.tee "
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -132,6 +136,7 @@ instance Eq ASTExpression where
   (RelOp r1 e11 e12) == (RelOp r2 e21 e22) =
     r1 == r2 && e11 == e21 && e12 == e22
   (UnOp u1 e1) == (UnOp u2 e2) = u1 == u2 && e1 == e2
+  (GlobalTee e1) == (GlobalTee e2) = e1 == e2
   _ == _ = False
 
 instance Show ASTExpression where
@@ -161,6 +166,13 @@ show' (RelOp r e1 e2) d =
     ++ show' e1 (d + 1)
     ++ show' e2 (d + 1)
     ++ ")"
+show' (GlobalTee e) d =
+  "\n"
+    ++ concat (replicate d "\t")
+    ++ "("
+    ++ " global.tee "
+    ++ show' e (d + 1)
+    ++ ")"
 
 -- | Returns the maximum depth of an AST.
 getMaxDepth :: ASTExpression -> Int
@@ -169,6 +181,7 @@ getMaxDepth (Param _) = 0
 getMaxDepth (UnOp _ e) = 1 + getMaxDepth e
 getMaxDepth (BinOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
+getMaxDepth (GlobalTee e) = 1 + getMaxDepth e
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
@@ -177,6 +190,7 @@ getNrNodes (Param _) = 2
 getNrNodes (UnOp _ e) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
+getNrNodes (GlobalTee e) = 1 + getNrNodes e
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes' :: ASTExpression -> Int
@@ -185,6 +199,7 @@ getNrNodes' (Param _) = 2
 getNrNodes' (UnOp _ e) = 1 + getNrNodes e
 getNrNodes' (BinOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
 getNrNodes' (RelOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
+getNrNodes' (GlobalTee e) = 2 + getNrNodes e
 
 getParameters :: ASTExpression -> [Int]
 getParameters (Const _) = []
@@ -192,6 +207,7 @@ getParameters (Param i) = [i]
 getParameters (UnOp _ e) = nub $ getParameters e
 getParameters (BinOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
 getParameters (RelOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
+getParameters (GlobalTee e) = nub $ getParameters e
 
 -- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int
