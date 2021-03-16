@@ -22,7 +22,6 @@ import Data.ByteString as BS (ByteString, writeFile)
 import Foreign
 import Foreign.C.String
 import Foreign.C.Types
-import Foreign.Marshal.Array
 import Generators
 import Pool
 import System.Directory
@@ -50,8 +49,7 @@ generateExpression m names (GlobalTee e) = do
   glblset <- globalSet m internal ge
   glblget <- globalGet m internal float64
   exprPtr <- newArray [glblset, glblget]
-  let namePtr = nullPtr
-  block m namePtr exprPtr 2 float64
+  block m nullPtr exprPtr 2 float64
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
 generateExpressions :: [Module] -> [CString] -> IO [Expression]
