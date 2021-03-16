@@ -103,7 +103,7 @@ grow (Creature e r b a s) = Creature e r b (a + 1) s
 
 -- | Returns the same creature but with age 0
 reborn :: Creature -> Creature
-reborn (Creature e r b _ s) = Creature e r b 0 s
+reborn (Creature e r b _ _) = Creature e r b 0 0
 
 -- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
