@@ -91,6 +91,7 @@ growOne d = do
     then do
       g1 <- growOne $ d + 1
       g2 <- growOne $ d + 1
+      g3 <- growOne $ d + 1
       return $
         frequency
           [ (1, rConst),
@@ -100,7 +101,8 @@ growOne d = do
             (length [minBound :: RelationalOperation ..], rRelExpr g1 g2),
             (1, rGlobalTee g1),
             (1, rGlobalGet),
-            (1, rGlobalSet g1 g2)
+            (1, rGlobalSet g1 g2),
+            (1, rIf g1 g2 g3)
           ]
     else return $ oneof [rConst, rParam nrParam, rGlobalGet]
 

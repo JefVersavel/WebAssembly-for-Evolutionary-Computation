@@ -3,7 +3,7 @@
 module WasmGenerator where
 
 import AST
-import Binaryen.Expression (Expression, binary, block, constFloat64, globalGet, globalSet, unary)
+import Binaryen.Expression (Expression, binary, block, call, constFloat64, globalGet, globalSet, if_, unary)
 import Binaryen.Function (Function, getName)
 import Binaryen.Index (Index (Index))
 import Binaryen.Module
@@ -61,6 +61,14 @@ generateExpression m names (GlobalSet e1 e2) = do
   glblset <- globalSet m internal ge1
   exprPtr <- newArray [glblset, ge2]
   block m nullPtr exprPtr 2 float64
+generateExpression m names (IfStatement c l r) = do
+  cond <- generateExpression m names c
+  lft <- generateExpression m names l
+  rght <- generateExpression m names r
+  (md, _, _) <- getModNames
+  condExpression <- newArray [cond]
+  conditional <- call m md condExpression 1 int32
+  if_ m conditional lft rght
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
 generateExpressions :: [Module] -> [CString] -> IO [Expression]
@@ -95,10 +103,8 @@ createModule e params
     let zipped = zip ([0, 1 ..] :: [CInt]) parameters
     (fInternal, sInternal, tInternal) <- getInternalNames
     addGlobalImport m fInternal sInternal tInternal float64 5
-    fst <- newCString "mod"
-    sec <- newCString "importFuncions"
-    thrd <- newCString "mod"
-    addFunctionImport m fst sec thrd float64 int32
+    (fMod, sMod, tMod) <- getModNames
+    addFunctionImport m fMod sMod tMod float64 int32
     _ <- addGlobalExport m fInternal tInternal
     mapM_ (addglobal m) zipped
     return m
@@ -123,6 +129,14 @@ getInternalNames = do
   first <- newCString "state"
   second <- newCString "internal"
   third <- newCString "state"
+  return (first, second, third)
+
+-- returns the names of the internal state
+getModNames :: IO (CString, CString, CString)
+getModNames = do
+  first <- newCString "mod"
+  second <- newCString "importFunctions"
+  third <- newCString "mod"
   return (first, second, third)
 
 -- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.
@@ -174,7 +188,7 @@ removeAllFiles = foldr ((>>) . removeFile) (return ())
 
 test :: IO [(ASTExpression, String)]
 test = do
-  let params = 5
-  exprs <- genASTExpressions 10 10 params 0.5 6
-  print exprs
-  createWasmFiles exprs params
+  let params = 1
+  let e = IfStatement (Const 2) (Const 1) (Const 2)
+  print e
+  createWasmFiles [e] params

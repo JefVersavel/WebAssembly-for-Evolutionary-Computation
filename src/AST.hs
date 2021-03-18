@@ -195,7 +195,7 @@ show' (GlobalSet r l) d =
 show' (IfStatement c l r) d =
   "\n"
     ++ concat (replicate d "\t")
-    ++ "("
+    ++ "( If"
     ++ show' c (d + 1)
     ++ show' l (d + 1)
     ++ show' r (d + 1)
