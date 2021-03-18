@@ -84,4 +84,5 @@ library
     , transformers
     , tree-diff
     , vector
+    , optparse-applicative
   default-language: Haskell2010

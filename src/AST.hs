@@ -28,6 +28,11 @@ data ASTExpression
   | -- | this is a block expression which acts the same as local.tee but for globals. it changes the internal
     -- | state of the organism
     GlobalTee ASTExpression
+  | -- | return the internal state
+    GlobalGet
+  | -- | sets the internal state to the value of the first
+    -- | expression and then continues with the second expression
+    GlobalSet ASTExpression ASTExpression
   deriving (Generic)
 
 instance ToExpr ASTExpression
@@ -75,6 +80,8 @@ smallShow (BinOp b _ _) = show b
 smallShow (UnOp u _) = show u
 smallShow (RelOp r _ _) = show r
 smallShow (GlobalTee _) = "global.tee "
+smallShow GlobalGet = "global.get"
+smallShow (GlobalSet _ _) = "global.set"
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -173,6 +180,15 @@ show' (GlobalTee e) d =
     ++ " global.tee "
     ++ show' e (d + 1)
     ++ ")"
+show' GlobalGet _ = " global.get"
+show' (GlobalSet r l) d =
+  "\n"
+    ++ concat (replicate d "\t")
+    ++ "("
+    ++ " global.set "
+    ++ show' r (d + 1)
+    ++ show' l (d + 1)
+    ++ ")"
 
 -- | Returns the maximum depth of an AST.
 getMaxDepth :: ASTExpression -> Int
@@ -182,15 +198,19 @@ getMaxDepth (UnOp _ e) = 1 + getMaxDepth e
 getMaxDepth (BinOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (GlobalTee e) = 1 + getMaxDepth e
+getMaxDepth GlobalGet = 0
+getMaxDepth (GlobalSet e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
-getNrNodes (Const _) = 2
-getNrNodes (Param _) = 2
+getNrNodes (Const _) = 1
+getNrNodes (Param _) = 1
 getNrNodes (UnOp _ e) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (GlobalTee e) = 1 + getNrNodes e
+getNrNodes (GlobalSet e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
+getNrNodes GlobalGet = 1
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes' :: ASTExpression -> Int
@@ -200,6 +220,8 @@ getNrNodes' (UnOp _ e) = 1 + getNrNodes e
 getNrNodes' (BinOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
 getNrNodes' (RelOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
 getNrNodes' (GlobalTee e) = 2 + getNrNodes e
+getNrNodes' (GlobalSet e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
+getNrNodes' GlobalGet = 2
 
 getParameters :: ASTExpression -> [Int]
 getParameters (Const _) = []
@@ -208,6 +230,8 @@ getParameters (UnOp _ e) = nub $ getParameters e
 getParameters (BinOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
 getParameters (RelOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
 getParameters (GlobalTee e) = nub $ getParameters e
+getParameters GlobalGet = []
+getParameters (GlobalSet e1 e2) = nub $ getParameters e1 ++ getParameters e2
 
 -- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int

@@ -4,17 +4,22 @@ import AST
 import Data.Ratio
 import Data.TreeDiff
 import qualified Generators as G
+import Options.Applicative.Help.Levenshtein
+import StackExpressions
 
 compTest = do
   let first = Const 1
   let second = BinOp Add (Const 1) (Const 5)
-  print $ prettyEditExpr $ ediff first second
+  print $ toStack first
+  print $ toStack second
   print $ matchingPercentage first second
-  print $ getMatchingRatio first second
-  print $ differencePercentage first second
 
 matchingPercentage :: ASTExpression -> ASTExpression -> Ratio Int
-matchingPercentage l r = uncurry (%) (getMatchingRatio l r)
+matchingPercentage l r = match % sizes
+  where
+    sizes = size l + size r
+    dst = getEditDistance l r
+    match = sizes - dst
 
 differencePercentage :: ASTExpression -> ASTExpression -> Ratio Int
 differencePercentage l r = 1 - uncurry (%) (getMatchingRatio l r)
@@ -36,6 +41,9 @@ instance MatchingRatio ASTExpression where
     | otherwise = (2, 4)
   getMatchingRatio (Param _) l = (0, size l + 2)
   getMatchingRatio r (Param _) = (0, size r + 2)
+  getMatchingRatio GlobalGet GlobalGet = (0, 2)
+  getMatchingRatio GlobalGet l = (0, size l + 2)
+  getMatchingRatio r GlobalGet = (0, size r + 2)
   getMatchingRatio (BinOp opl ll lr) (BinOp opr rl rr) =
     (num, denom)
     where
@@ -76,6 +84,10 @@ instance MatchingRatio ASTExpression where
       op = getMatchingRatio opl opr
       num = fst rest + fst op
       denom = snd rest + snd op
+  getMatchingRatio (GlobalTee l) (GlobalTee r) =
+    (fst rest + 1, snd rest + 1)
+    where
+      rest = getMatchingRatio l r
   getMatchingRatio (UnOp opl ll) (BinOp opr rl rr) = getMatchingRatio (BinOp opr rl rr) (UnOp opl ll)
   getMatchingRatio (UnOp opl ll) (RelOp opr rl rr) = getMatchingRatio (RelOp opr rl rr) (UnOp opl ll)
 

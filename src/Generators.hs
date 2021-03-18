@@ -66,6 +66,14 @@ rParam m = Param <$> elements [0, 1 .. (m - 1)]
 rGlobalTee :: Gen ASTExpression -> Gen ASTExpression
 rGlobalTee gExpr = GlobalTee <$> gExpr
 
+rGlobalGet :: Gen ASTExpression
+rGlobalGet = return GlobalGet
+
+rGlobalSet :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
+rGlobalSet gExpr1 gExpr2 = do
+  e1 <- gExpr1
+  GlobalSet e1 <$> gExpr2
+
 -- | GROW algorithm that builds a generator for an ASTExpression.
 -- As long as the depth is shorter than the given maximum depth all possible nodes can be chosen.
 -- Once the given maximum epth is reached only leaf nodes an be chosen such as a constant or a parameter.
@@ -84,9 +92,11 @@ growOne d = do
             (length [minBound :: BinaryOperation ..], rBinExpr g1 g2),
             (length [minBound :: UnaryOperation ..], rUnExpr g1),
             (length [minBound :: RelationalOperation ..], rRelExpr g1 g2),
-            (10, rGlobalTee g1)
+            (1, rGlobalTee g1),
+            (1, rGlobalGet),
+            (1, rGlobalSet g1 g2)
           ]
-    else return $ oneof [rConst, rParam nrParam]
+    else return $ oneof [rConst, rParam nrParam, rGlobalGet]
 
 -- | Helper function for the GROW algorithm to set the initial QCGen.
 growOneInit :: QCGen -> Reader (Depth, NrParam) (Gen ASTExpression)
@@ -111,9 +121,10 @@ fullOne d = do
           [ (length [minBound :: BinaryOperation ..], rBinExpr f1 f2),
             (length [minBound :: UnaryOperation ..], rUnExpr f1),
             (length [minBound :: RelationalOperation ..], rRelExpr f1 f2),
-            (10, rGlobalTee f1)
+            (10, rGlobalTee f1),
+            (1, rGlobalSet f1 f2)
           ]
-    else return $ oneof [rConst, rParam nrParam]
+    else return $ oneof [rConst, rParam nrParam, rGlobalGet]
 
 -- | Helper function for the FULL algorithm to set the initial QCGen.
 fullOneInit :: QCGen -> Reader (Depth, NrParam) (Gen ASTExpression)
