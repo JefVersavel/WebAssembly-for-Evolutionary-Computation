@@ -33,6 +33,8 @@ data ASTExpression
   | -- | sets the internal state to the value of the first
     -- | expression and then continues with the second expression
     GlobalSet ASTExpression ASTExpression
+  | -- | if statement: the first expression is the condition and the following two the branches
+    IfStatement ASTExpression ASTExpression ASTExpression
   deriving (Generic)
 
 instance ToExpr ASTExpression
@@ -82,6 +84,7 @@ smallShow (RelOp r _ _) = show r
 smallShow (GlobalTee _) = "global.tee "
 smallShow GlobalGet = "global.get"
 smallShow (GlobalSet _ _) = "global.set"
+smallShow (IfStatement {}) = "If"
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -189,6 +192,14 @@ show' (GlobalSet r l) d =
     ++ show' r (d + 1)
     ++ show' l (d + 1)
     ++ ")"
+show' (IfStatement c l r) d =
+  "\n"
+    ++ concat (replicate d "\t")
+    ++ "("
+    ++ show' c (d + 1)
+    ++ show' l (d + 1)
+    ++ show' r (d + 1)
+    ++ ")"
 
 -- | Returns the maximum depth of an AST.
 getMaxDepth :: ASTExpression -> Int
@@ -200,6 +211,7 @@ getMaxDepth (RelOp _ e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (GlobalTee e) = 1 + getMaxDepth e
 getMaxDepth GlobalGet = 0
 getMaxDepth (GlobalSet e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
+getMaxDepth (IfStatement c e1 e2) = 1 + maximum [getMaxDepth c, getMaxDepth e1, getMaxDepth e2]
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
@@ -211,6 +223,7 @@ getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (GlobalTee e) = 1 + getNrNodes e
 getNrNodes (GlobalSet e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes GlobalGet = 1
+getNrNodes (IfStatement c l r) = 1 + getNrNodes c + getNrNodes l + getNrNodes r
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes' :: ASTExpression -> Int
@@ -232,6 +245,7 @@ getParameters (RelOp _ e1 e2) = nub $ getParameters e1 ++ getParameters e2
 getParameters (GlobalTee e) = nub $ getParameters e
 getParameters GlobalGet = []
 getParameters (GlobalSet e1 e2) = nub $ getParameters e1 ++ getParameters e2
+getParameters (IfStatement c l r) = nub $ getParameters c ++ getParameters l ++ getParameters r
 
 -- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int

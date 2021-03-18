@@ -74,6 +74,12 @@ rGlobalSet gExpr1 gExpr2 = do
   e1 <- gExpr1
   GlobalSet e1 <$> gExpr2
 
+rIf :: Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression -> Gen ASTExpression
+rIf gC gL gR = do
+  c <- gC
+  l <- gL
+  IfStatement c l <$> gR
+
 -- | GROW algorithm that builds a generator for an ASTExpression.
 -- As long as the depth is shorter than the given maximum depth all possible nodes can be chosen.
 -- Once the given maximum epth is reached only leaf nodes an be chosen such as a constant or a parameter.

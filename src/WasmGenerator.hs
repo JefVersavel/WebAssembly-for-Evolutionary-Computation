@@ -10,12 +10,13 @@ import Binaryen.Module
   ( Module,
     addFunction,
     addFunctionExport,
+    addFunctionImport,
     addGlobalExport,
     addGlobalImport,
     create,
   )
 import Binaryen.Op
-import Binaryen.Type (float64, none)
+import Binaryen.Type (float64, int32, none)
 import BinaryenTranslation
 import BinaryenUtils
 import Data.ByteString as BS (ByteString, writeFile)
@@ -94,6 +95,10 @@ createModule e params
     let zipped = zip ([0, 1 ..] :: [CInt]) parameters
     (fInternal, sInternal, tInternal) <- getInternalNames
     addGlobalImport m fInternal sInternal tInternal float64 5
+    fst <- newCString "mod"
+    sec <- newCString "importFuncions"
+    thrd <- newCString "mod"
+    addFunctionImport m fst sec thrd float64 int32
     _ <- addGlobalExport m fInternal tInternal
     mapM_ (addglobal m) zipped
     return m
