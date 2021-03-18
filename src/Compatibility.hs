@@ -4,17 +4,22 @@ import AST
 import Data.Ratio
 import Data.TreeDiff
 import qualified Generators as G
+import Options.Applicative.Help.Levenshtein
+import StackExpressions
 
 compTest = do
   let first = Const 1
   let second = BinOp Add (Const 1) (Const 5)
-  print $ prettyEditExpr $ ediff first second
+  print $ toStack first
+  print $ toStack second
   print $ matchingPercentage first second
-  print $ getMatchingRatio first second
-  print $ differencePercentage first second
 
 matchingPercentage :: ASTExpression -> ASTExpression -> Ratio Int
-matchingPercentage l r = uncurry (%) (getMatchingRatio l r)
+matchingPercentage l r = match % sizes
+  where
+    sizes = size l + size r
+    dst = getEditDistance l r
+    match = sizes - dst
 
 differencePercentage :: ASTExpression -> ASTExpression -> Ratio Int
 differencePercentage l r = 1 - uncurry (%) (getMatchingRatio l r)

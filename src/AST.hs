@@ -203,8 +203,8 @@ getMaxDepth (GlobalSet e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
-getNrNodes (Const _) = 2
-getNrNodes (Param _) = 2
+getNrNodes (Const _) = 1
+getNrNodes (Param _) = 1
 getNrNodes (UnOp _ e) = 1 + getNrNodes e
 getNrNodes (BinOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes (RelOp _ e1 e2) = 1 + getNrNodes e1 + getNrNodes e2

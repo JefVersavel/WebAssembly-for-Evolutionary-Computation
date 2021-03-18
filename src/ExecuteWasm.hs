@@ -15,6 +15,7 @@ import Language.JavaScript.Inline
 executeModule :: BS.ByteString -> [Double] -> Double -> IO (Maybe Output)
 executeModule bytes params int =
   withSession defaultConfig $ \session -> do
+    print $ length params
     let val1 = Aeson $ head params
     let val2 = Aeson $ params !! 1
     let val3 = Aeson $ params !! 2

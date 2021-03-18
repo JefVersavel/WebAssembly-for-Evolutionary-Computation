@@ -243,16 +243,16 @@ executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutatio
       reproduce gen env runnables mutationRate nrParam
     Up -> do
       print "moving up"
-      tryMovement gen runnables U env
+      tryMovement gen runnables U env nrParam
     Down -> do
       print "moving down"
-      tryMovement gen runnables D env
+      tryMovement gen runnables D env nrParam
     Rght -> do
       print "moving right"
-      tryMovement gen runnables R env
+      tryMovement gen runnables R env nrParam
     Lft -> do
       print "moving left"
-      tryMovement gen runnables L env
+      tryMovement gen runnables L env nrParam
     None -> print "do nothing" >> return (xs ++ [Runnable creature pos ResourceAquirement []], env)
 
 tryMovement ::
@@ -260,9 +260,10 @@ tryMovement ::
   [Runnable Creature] ->
   Move ->
   Environment Creature ->
+  Int ->
   IO ([Runnable Creature], Environment Creature)
-tryMovement _ [] _ env = return ([], env)
-tryMovement gen (Runnable creature pos _ _ : rest) mov env =
+tryMovement _ [] _ env _ = return ([], env)
+tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam =
   case moveOrg env pos mov of
     Left (newPos, newEnv) -> do
       print newPos
@@ -287,8 +288,9 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env =
           putStr $ show leftChild
           putStr "rightchild:"
           putStr $ show rightChild
-          leftSer <- serializeExpression leftChild 1
-          rightSer <- serializeExpression rightChild 1
+          leftSer <- serializeExpression leftChild nrParam
+          rightSer <- serializeExpression rightChild nrParam
+          print "serialization has happened"
           (lPos, rPos) <- getChildPositions crossgen env pos newPos
           let lft =
                 Creature

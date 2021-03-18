@@ -47,6 +47,13 @@ instance Show InstructionSequence where
   show (Seq []) = ""
   show (Seq (x : xs)) = show x ++ "\n" ++ show (Seq xs)
 
+-- | https://www.academia.edu/26551805/Lazy_dynamic_programming_can_be_eager
+getEditDistance :: ASTExpression -> ASTExpression -> Int
+getEditDistance l r = editDistance first second
+  where
+    (Seq first) = toStack l
+    (Seq second) = toStack r
+
 stacktest = do
   expr <- randomGenerationTest
   let first = expr !! 7

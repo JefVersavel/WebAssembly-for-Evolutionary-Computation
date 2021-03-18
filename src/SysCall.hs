@@ -28,7 +28,7 @@ decideSysCall n expr =
   generate $
     useSeed gen $
       frequency
-        [(dpth, return Reproduction), (sze, elements [Up, Down, Rght, Lft]), (sze - dpth, return None)]
+        [(sze, return Reproduction), (sze - dpth, elements [Up, Down, Rght, Lft]), (dpth, return None)]
   where
     gen = mkQCGen $ round n
     dpth = getMaxDepth expr
