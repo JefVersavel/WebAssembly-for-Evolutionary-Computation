@@ -34,6 +34,14 @@ getSubExpression i (GlobalSet e1 e2)
   where
     nrNodes1 = getNrNodes e1
     dec = i - 1
+getSubExpression i (IfStatement c l r)
+  | i <= nrNodesC = getSubExpression dec c
+  | i <= nrNodesL + nrNodesC = getSubExpression (dec - nrNodesC) l
+  | otherwise = getSubExpression (dec - nrNodesC - nrNodesL) r
+  where
+    nrNodesC = getNrNodes c
+    nrNodesL = getNrNodes l
+    dec = i - 1
 
 -- | Inserts an expression into another expression at the givin place.
 insertSubExpression :: Int -> ASTExpression -> ASTExpression -> ASTExpression
@@ -62,6 +70,14 @@ insertSubExpression i (GlobalSet e1 e2) e3
   | otherwise = GlobalSet e1 (insertSubExpression (dec - nrNodes1) e2 e3)
   where
     nrNodes1 = getNrNodes e1
+    dec = i - 1
+insertSubExpression i (IfStatement c l r) e
+  | i <= nrNodesC = IfStatement (insertSubExpression dec c e) l r
+  | i <= nrNodesL + nrNodesC = IfStatement c (insertSubExpression (dec - nrNodesC) l e) r
+  | otherwise = IfStatement c l (insertSubExpression (dec - nrNodesC - nrNodesL) r e)
+  where
+    nrNodesC = getNrNodes c
+    nrNodesL = getNrNodes l
     dec = i - 1
 
 -- | Returns a tuple of a randomly generated place and the next generator.
@@ -183,6 +199,9 @@ permute _ GlobalGet = GlobalGet
 permute g (GlobalSet e1 e2) = GlobalSet e11 e22
   where
     (e11, e22) = switch g (e1, e2)
+permute g (IfStatement c l r) = IfStatement cc ll rr
+  where
+    (cc, ll, rr) = switchThree g (c, l, r)
 
 -- | Randomly switches the elements in a tuple based on a random number generator that either returns 0 or 1.
 switch :: RandomGen g => g -> (a, a) -> (a, a)
@@ -191,6 +210,17 @@ switch g (l, r)
   | otherwise = (r, l)
   where
     i = fst $ randomR (0, 1) g :: Int
+
+switchThree :: RandomGen g => g -> (a, a, a) -> (a, a, a)
+switchThree g (l, m, r)
+  | i == 0 = (l, m, r)
+  | i == 1 = (m, l, r)
+  | i == 0 = (l, r, m)
+  | i == 0 = (m, r, l)
+  | i == 0 = (r, m, l)
+  | otherwise = (r, l, m)
+  where
+    i = fst $ randomR (0, 5) g :: Int
 
 testExpression :: ASTExpression
 testExpression =

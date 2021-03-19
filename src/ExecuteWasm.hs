@@ -54,9 +54,12 @@ executeModule bytes params int =
       mutable: true
   }, $internalValue)
 
+  mod = x => Math.round(x) % 2
+
   let importObject = {
       external: { param0, param1, param2, param3, param4 },
-      internal: { state }
+      internal: { state },
+      importFunctions: { mod }
   };
   return WebAssembly.instantiate(typedArray,importObject).then(result => {
     let json = {}
