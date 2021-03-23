@@ -41,6 +41,12 @@ data Environment a = Organism a =>
 instance (Show a, Organism a) => Show (Environment a) where
   show env = showCells $ toLists $ grid env
 
+countResources :: Environment a -> Int
+countResources env = length $ concat $ toList $ getResources <$> grid env
+
+countOrgs :: Environment a -> Int
+countOrgs env = length $ filter id $ toList $ isOrg <$> grid env
+
 -- | Returns the x coordinate of the given position.
 getX :: Pos -> Int
 getX (x, _) = x
@@ -282,7 +288,7 @@ addResourceToNeighbours gen env pos d = do
     Just r -> return $ insertResourcesAt env (d : r) neighbour
 
 -- | Returns True if the given cell contains an organism.
-isOrg :: Organism a => Cell a -> Bool
+isOrg :: Cell a -> Bool
 isOrg (Org _, _) = True
 isOrg _ = False
 
