@@ -2,9 +2,6 @@ module Compatibility where
 
 import AST
 import Data.Ratio
-import Data.TreeDiff
-import qualified Generators as G
-import Options.Applicative.Help.Levenshtein
 import StackExpressions
 
 compTest = do

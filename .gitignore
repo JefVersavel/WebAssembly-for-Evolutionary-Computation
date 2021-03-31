@@ -27,3 +27,7 @@ test.txt
 csv/
 
 *.log
+
+postStats/
+
+trackingStats/
