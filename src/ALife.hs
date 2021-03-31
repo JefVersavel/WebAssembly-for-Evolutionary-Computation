@@ -190,7 +190,7 @@ reproduce ::
   [Runnable Creature] ->
   Int ->
   Int ->
-  IO ([Runnable Creature], Environment Creature)
+  StateT TrackingStats IO ([Runnable Creature], Environment Creature)
 reproduce _ env [] _ _ = return ([], env)
 reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
   let nils = getNilNeighbours env pos
@@ -199,16 +199,18 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
       (n, g3) = randomR (1, mutationRate) g1
   childPos <-
     if null nils
-      then selectPosition g2 $ getNeighbours env pos
-      else selectPosition g2 nils
-  print childPos
+      then liftIO $ selectPosition g2 $ getNeighbours env pos
+      else liftIO $ selectPosition g2 nils
+  print' childPos
   let newRest = filter (\(Runnable _ p _ _) -> p /= childPos) rest
   if n == 1
     then do
-      print "mutate"
-      mutated <- mutateCreature g3 newCreature nrParam
-      print "this is the child"
-      putStr $ show mutated
+      print' "mutate"
+      stats <- get
+      put $ addMutation stats
+      mutated <- liftIO $ mutateCreature g3 newCreature nrParam
+      print' "this is the child"
+      putStr' $ show mutated
       return
         ( newRest
             ++ [ Runnable creature pos ResourceAquirement [],
@@ -217,9 +219,11 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
           insertOrganismAt env mutated childPos
         )
     else do
-      print "don't mutate"
-      print "this is the child"
-      putStr $ show newCreature
+      print' "don't mutate"
+      stats <- get
+      put $ addNoneMutation stats
+      print' "this is the child"
+      putStr' $ show newCreature
       return
         ( newRest
             ++ [ Runnable creature pos ResourceAquirement [],
@@ -246,7 +250,7 @@ executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutatio
       print' "reproducing"
       stats <- get
       put $ addReproduction $ addNoneMovement stats
-      liftIO $ reproduce gen env runnables mutationRate nrParam
+      reproduce gen env runnables mutationRate nrParam
     Up -> do
       print' "moving up"
       stats <- get
@@ -542,10 +546,15 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
           (length . getParameters . expression)
           (\_ _ -> 0)
           age
-  print trackingStats
-  print postStats
+  -- serialize these stats
+  let trackingDirectory = "./trackingStats/"
+  let postDirectory = "./postStats/"
+  createDirectoryIfMissing True trackingDirectory
+  createDirectoryIfMissing True postDirectory
+  encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
+  encodeFile (postDirectory ++ name) $ toJSON postStats
   serialize (env : envList) name
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 10 10 1000 5 6 4 10 2
+  mainCreature 6546 10 1000 5 6 4 10 2

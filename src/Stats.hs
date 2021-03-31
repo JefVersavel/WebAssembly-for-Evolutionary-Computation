@@ -1,6 +1,11 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Stats where
 
+import Data.Aeson
 import Environment
+import GHC.Generics
 import Organism
 
 type Tracking = [Int]
@@ -10,12 +15,13 @@ type Post = [[Int]]
 data TrackingStats = TrackingStats
   { reproductions :: Tracking,
     movements :: Tracking,
-    crossovers :: Tracking
+    crossovers :: Tracking,
+    mutations :: Tracking
   }
-  deriving (Show)
+  deriving (Show, Generic, ToJSON)
 
 emptyTracking :: TrackingStats
-emptyTracking = TrackingStats [] [] []
+emptyTracking = TrackingStats [] [] [] []
 
 data PostStats = PostStats
   { sizes :: Post,
@@ -26,14 +32,14 @@ data PostStats = PostStats
     resourceGrowth :: Tracking,
     popGrowth :: Tracking
   }
-  deriving (Show)
+  deriving (Show, Generic, ToJSON)
 
 type TrackingStatsCalc = Int -> TrackingStats -> TrackingStats
 
 type ManipulateTrackingStats = TrackingStats -> TrackingStats
 
 reproductionAddition :: TrackingStatsCalc
-reproductionAddition i (TrackingStats r m c) = TrackingStats (r ++ [i]) m c
+reproductionAddition i (TrackingStats r m c mu) = TrackingStats (r ++ [i]) m c mu
 
 addReproduction :: ManipulateTrackingStats
 addReproduction = reproductionAddition 1
@@ -42,7 +48,7 @@ addNoneReproduction :: ManipulateTrackingStats
 addNoneReproduction = reproductionAddition 0
 
 movementsAddition :: TrackingStatsCalc
-movementsAddition i (TrackingStats r m c) = TrackingStats r (m ++ [i]) c
+movementsAddition i (TrackingStats r m c mu) = TrackingStats r (m ++ [i]) c mu
 
 addMovement :: ManipulateTrackingStats
 addMovement = movementsAddition 1
@@ -51,13 +57,22 @@ addNoneMovement :: ManipulateTrackingStats
 addNoneMovement = movementsAddition 0
 
 crossoverAddition :: TrackingStatsCalc
-crossoverAddition i (TrackingStats r m c) = TrackingStats r m (c ++ [i])
+crossoverAddition i (TrackingStats r m c mu) = TrackingStats r m (c ++ [i]) mu
 
 addCrossover :: ManipulateTrackingStats
 addCrossover = crossoverAddition 1
 
 addNoneCrossover :: ManipulateTrackingStats
 addNoneCrossover = crossoverAddition 0
+
+mutationAddition :: TrackingStatsCalc
+mutationAddition i (TrackingStats r m c mu) = TrackingStats r m c $ mu ++ [i]
+
+addMutation :: ManipulateTrackingStats
+addMutation = mutationAddition 1
+
+addNoneMutation :: ManipulateTrackingStats
+addNoneMutation = mutationAddition 0
 
 calcMetric :: Organism a => (a -> Int) -> [Environment a] -> Post
 calcMetric _ [] = []
