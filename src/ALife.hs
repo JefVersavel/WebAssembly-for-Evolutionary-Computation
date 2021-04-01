@@ -513,6 +513,7 @@ makeState env iterations =
         (List.sortOn (\(_, org :: Creature) -> age org) $ getOrgsPos env)
     )
 
+-- | calculates the matching of all the orgs in the environment
 calculateDiversity :: [Environment Creature] -> [[Double]]
 calculateDiversity envs = matchPercentages <$> stacks
   where
