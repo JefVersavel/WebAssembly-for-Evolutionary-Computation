@@ -27,7 +27,7 @@ data PostStats = PostStats
   { sizes :: Post,
     depths :: Post,
     nrParams :: Post,
-    diversity :: Post,
+    diversity :: [[Double]],
     ages :: Post,
     resourceGrowth :: Tracking,
     popGrowth :: Tracking
@@ -90,15 +90,15 @@ postCalculation ::
   (a -> Int) ->
   (a -> Int) ->
   (a -> Int) ->
-  (a -> a -> Int) ->
+  [[Double]] ->
   (a -> Int) ->
   PostStats
-postCalculation env sizeCalc depthCalc paramCalc diversityCalc ageCalc =
+postCalculation env sizeCalc depthCalc paramCalc divers ageCalc =
   PostStats
     (calcMetric sizeCalc env)
     (calcMetric depthCalc env)
     (calcMetric paramCalc env)
-    (calcDualMetric diversityCalc env)
+    divers
     (calcMetric ageCalc env)
     (map countResources env)
     (map countOrgs env)

@@ -35,6 +35,7 @@ class ToStack a where
   toStack :: a -> InstructionSequence
 
 newtype InstructionSequence = Seq [StackInstruction]
+  deriving (Eq)
 
 (+++) :: InstructionSequence -> InstructionSequence -> InstructionSequence
 (Seq l) +++ (Seq r) = Seq $ l ++ r
@@ -60,6 +61,9 @@ getEditDistance l r = editDistance first second
   where
     (Seq first) = toStack l
     (Seq second) = toStack r
+
+editDist :: InstructionSequence -> InstructionSequence -> Int
+editDist (Seq first) (Seq second) = editDistance first second
 
 stacktest = do
   expr <- randomGenerationTest

@@ -25,6 +25,7 @@ import Movement
 import Organism
 import Running
 import Seeding
+import StackExpressions hiding (R, U)
 import Stats
 import SysCall
 import System.Directory
@@ -512,6 +513,25 @@ makeState env iterations =
         (List.sortOn (\(_, org :: Creature) -> age org) $ getOrgsPos env)
     )
 
+calculateDiversity :: [Environment Creature] -> [[Double]]
+calculateDiversity envs = matchPercentages <$> stacks
+  where
+    creatures = getAllOrgs <$> envs
+    stacks = (creatureToStack <$>) <$> creatures
+
+matchPercentages :: [(InstructionSequence, Int)] -> [Double]
+matchPercentages [] = []
+matchPercentages [_] = []
+matchPercentages ((x, lx) : l) =
+  [1 - (fromIntegral (editDist x y) / fromIntegral (lx + ly)) | (y, ly) <- l]
+    ++ matchPercentages l
+
+creatureToStack :: Creature -> (InstructionSequence, Int)
+creatureToStack org =
+  let ex = expression org
+      (Seq stack) = toStack ex
+   in (Seq stack, length stack)
+
 -- | The main function.
 mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> IO ()
 mainCreature seed start iterations l depth mutationRate divider nrParam = do
@@ -544,7 +564,7 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
           (size . expression)
           (getMaxDepth . expression)
           (length . getParameters . expression)
-          (\_ _ -> 0)
+          (calculateDiversity envList)
           age
   -- serialize these stats
   let trackingDirectory = "./trackingStats/"
@@ -557,4 +577,4 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 6546 10 1000 5 6 4 10 2
+  mainCreature 6546 10 10000 5 6 4 10 1
