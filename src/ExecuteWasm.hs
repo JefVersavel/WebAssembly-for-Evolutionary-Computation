@@ -82,3 +82,25 @@ instance ToJSON Output
 executionTest = do
   bytes <- BS.readFile "./src/wasm/p1.wasm"
   executeModule bytes [1, 1, 1, 1, 1] 4
+
+inlineTest = do
+  session <- newSession defaultConfig
+  (i :: Aeson Int) <-
+    eval
+      session
+      [js|
+    const storage = require('node-persist');
+    const a = 4;
+    await storage.setItem('a', a);
+    return a;
+    |]
+  print i
+  (i' :: Aeson Int) <-
+    eval
+      session
+      [js| 
+    const storage = require('node-persist');
+    return await storage.getItem('a');
+    |]
+  print i'
+  print "ok"
