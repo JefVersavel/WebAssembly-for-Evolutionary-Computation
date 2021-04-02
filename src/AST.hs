@@ -35,6 +35,8 @@ data ASTExpression
     GlobalSet ASTExpression ASTExpression
   | -- | if statement: the first expression is the condition and the following two the branches
     IfStatement ASTExpression ASTExpression ASTExpression
+  | -- | inported function with given name
+    ImportedFunctionCall String [ASTExpression]
   deriving (Generic)
 
 instance ToExpr ASTExpression
@@ -84,7 +86,8 @@ smallShow (RelOp r _ _) = show r
 smallShow (GlobalTee _) = "global.tee "
 smallShow GlobalGet = "global.get"
 smallShow (GlobalSet _ _) = "global.set"
-smallShow (IfStatement {}) = "If"
+smallShow IfStatement {} = "If"
+smallShow (ImportedFunctionCall name _) = name
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -200,6 +203,13 @@ show' (IfStatement c l r) d =
     ++ show' l (d + 1)
     ++ show' r (d + 1)
     ++ ")"
+show' (ImportedFunctionCall name exprs) d =
+  "\n"
+    ++ concat (replicate d "\t")
+    ++ "( "
+    ++ name
+    ++ concat ((\e -> show' e (d + 1)) <$> exprs)
+    ++ " )"
 
 -- | Returns the maximum depth of an AST.
 getMaxDepth :: ASTExpression -> Int
@@ -212,6 +222,7 @@ getMaxDepth (GlobalTee e) = 1 + getMaxDepth e
 getMaxDepth GlobalGet = 0
 getMaxDepth (GlobalSet e1 e2) = 1 + max (getMaxDepth e1) (getMaxDepth e2)
 getMaxDepth (IfStatement c e1 e2) = 1 + maximum [getMaxDepth c, getMaxDepth e1, getMaxDepth e2]
+getMaxDepth (ImportedFunctionCall _ e) = 1 + maximum (getMaxDepth <$> e)
 
 -- | Returns the total number of nodes in a nAST.
 getNrNodes :: ASTExpression -> Int
@@ -224,17 +235,7 @@ getNrNodes (GlobalTee e) = 1 + getNrNodes e
 getNrNodes (GlobalSet e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes GlobalGet = 1
 getNrNodes (IfStatement c l r) = 1 + getNrNodes c + getNrNodes l + getNrNodes r
-
--- | Returns the total number of nodes in a nAST.
-getNrNodes' :: ASTExpression -> Int
-getNrNodes' (Const _) = 2
-getNrNodes' (Param _) = 2
-getNrNodes' (UnOp _ e) = 1 + getNrNodes e
-getNrNodes' (BinOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' (RelOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' (GlobalTee e) = 2 + getNrNodes e
-getNrNodes' (GlobalSet e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' GlobalGet = 2
+getNrNodes (ImportedFunctionCall _ e) = 1 + sum (getNrNodes <$> e)
 
 getParameters :: ASTExpression -> [Int]
 getParameters (Const _) = []
@@ -246,6 +247,7 @@ getParameters (GlobalTee e) = nub $ getParameters e
 getParameters GlobalGet = []
 getParameters (GlobalSet e1 e2) = nub $ getParameters e1 ++ getParameters e2
 getParameters (IfStatement c l r) = nub $ getParameters c ++ getParameters l ++ getParameters r
+getParameters (ImportedFunctionCall _ e) = nub $ concat (getParameters <$> e)
 
 -- | Returns the size of an AST. Has the same implementation as getNrNodes.
 size :: ASTExpression -> Int
