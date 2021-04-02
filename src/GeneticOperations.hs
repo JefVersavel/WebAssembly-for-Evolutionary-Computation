@@ -3,6 +3,7 @@ module GeneticOperations where
 import AST
 import Control.Monad.Reader
 import Generators
+import ImportedFunction
 import Seeding
 import System.Random
 import Test.QuickCheck
@@ -42,6 +43,17 @@ getSubExpression i (IfStatement c l r)
     nrNodesC = getNrNodes c
     nrNodesL = getNrNodes l
     dec = i - 1
+getSubExpression i (ImportedFunctionCall _ list) = getSubExpression newi e
+  where
+    nrList = getNrNodes <$> list
+    (index, newi) = findIndex 0 i nrList
+    e = list !! index
+
+findIndex :: Int -> Int -> [Int] -> (Int, Int)
+findIndex index n [] = (index, n) -- returns the last index but this is potentially risky so be careful
+findIndex index n (x : xs)
+  | n <= x = (index, n)
+  | otherwise = findIndex (index + 1) (n - x) xs
 
 -- | Inserts an expression into another expression at the givin place.
 insertSubExpression :: Int -> ASTExpression -> ASTExpression -> ASTExpression
@@ -79,6 +91,15 @@ insertSubExpression i (IfStatement c l r) e
     nrNodesC = getNrNodes c
     nrNodesL = getNrNodes l
     dec = i - 1
+insertSubExpression i (ImportedFunctionCall name list) e =
+  ImportedFunctionCall name $
+    first
+      ++ [insertSubExpression newi (head second) e]
+      ++ tail second
+  where
+    nrList = getNrNodes <$> list
+    (index, newi) = findIndex 0 i nrList
+    (first, second) = splitAt index list
 
 -- | Returns a tuple of a randomly generated place and the next generator.
 selectGenOpPoint :: RandomGen g => g -> ASTExpression -> (Int, g)
@@ -154,21 +175,21 @@ pointMutation g1 e i = do
     l = getRandomLeaf g2 i
 
 -- | Randomly generates a sub-expression with a givne maximum depth.
-generateSubTree :: QCGen -> Int -> Int -> IO ASTExpression
-generateSubTree g1 maxD nrParam
+generateSubTree :: QCGen -> Int -> Int -> ImportedFunctions -> IO ASTExpression
+generateSubTree g1 maxD nrParam functions
   | grow = generateExpr growOneInit
   | otherwise = generateExpr fullOneInit
   where
     (grow, g2) = randomR (True, False) g1
     (d, g3) = randomR (0, maxD) g2
-    generateExpr method = generate $ runReader (method g3) (d, nrParam)
+    generateExpr method = generate $ runReader (method g3) (d, nrParam, functions)
 
 -- | Performs sub-tree mutation which is achieved by randomly replacing a sub-tree of an expression by another randomly generated sub-tree.
-subTreeMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
-subTreeMutation g1 e nrParam = do
+subTreeMutation :: QCGen -> ASTExpression -> Int -> ImportedFunctions -> IO ASTExpression
+subTreeMutation g1 e nrParam functions = do
   let (p, g2) = selectGenOpPoint g1 e
   let maxD = getMaxDepth $ getSubExpression p e
-  subTree <- generateSubTree g2 maxD nrParam
+  subTree <- generateSubTree g2 maxD nrParam functions
   return $ insertSubExpression p e subTree
 
 -- | Perfroms reproduction which just returns the given expression.
