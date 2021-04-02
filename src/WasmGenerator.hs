@@ -19,76 +19,86 @@ import Binaryen.Op
 import Binaryen.Type (float64, int32, none)
 import BinaryenTranslation
 import BinaryenUtils
-import Data.ByteString as BS (ByteString, writeFile)
+import Control.Monad.Reader
+import qualified Data.ByteString as BS hiding (length, map)
 import Foreign
 import Foreign.C.String
 import Foreign.C.Types
 import Generators
+import ImportedFunction
 import Pool
 import System.Directory
 
 -- | Translates and ASTExpression to a binaryen expression and adds it to the given module.
 -- The given list of doubles is used to initialize the parameters in the ASTExpression.
-generateExpression :: Module -> [CString] -> ASTExpression -> IO Expression
-generateExpression m _ (Const d) = constFloat64 m d
-generateExpression m names (Param i) = globalGet m (names !! i) float64
-generateExpression m names (BinOp op e1 e2) = do
-  ge1 <- generateExpression m names e1
-  ge2 <- generateExpression m names e2
-  binary m (translateOp op) ge1 ge2
-generateExpression m names (UnOp op e) = do
-  ge <- generateExpression m names e
-  unary m (translateOp op) ge
-generateExpression m names (RelOp op e1 e2) = do
-  ge1 <- generateExpression m names e1
-  ge2 <- generateExpression m names e2
-  be <- binary m (translateOp op) ge1 ge2
-  unary m convertUInt32ToFloat64 be
-generateExpression m names (GlobalTee e) = do
-  ge <- generateExpression m names e
-  (internal, _, _) <- getInternalNames
-  glblset <- globalSet m internal ge
-  glblget <- globalGet m internal float64
-  exprPtr <- newArray [glblset, glblget]
-  block m nullPtr exprPtr 2 float64
-generateExpression m _ GlobalGet = do
-  (internal, _, _) <- getInternalNames
-  globalGet m internal float64
-generateExpression m names (GlobalSet e1 e2) = do
-  ge1 <- generateExpression m names e1
-  ge2 <- generateExpression m names e2
-  (internal, _, _) <- getInternalNames
-  glblset <- globalSet m internal ge1
-  exprPtr <- newArray [glblset, ge2]
-  block m nullPtr exprPtr 2 float64
-generateExpression m names (IfStatement c l r) = do
-  cond <- generateExpression m names c
-  lft <- generateExpression m names l
-  rght <- generateExpression m names r
-  (md, _, _) <- getModNames
-  condExpression <- newArray [cond]
-  conditional <- call m md condExpression 1 int32
-  if_ m conditional lft rght
+generateExpression :: Module -> ASTExpression -> ReaderT (ImportedFunctions, [CString]) IO Expression
+generateExpression m (Const d) = lift $ constFloat64 m d
+generateExpression m (Param i) = do
+  (_, names) <- ask
+  lift $ globalGet m (names !! i) float64
+generateExpression m (BinOp op e1 e2) = do
+  ge1 <- generateExpression m e1
+  ge2 <- generateExpression m e2
+  lift $ binary m (translateOp op) ge1 ge2
+generateExpression m (UnOp op e) = do
+  ge <- generateExpression m e
+  lift $ unary m (translateOp op) ge
+generateExpression m (RelOp op e1 e2) = do
+  ge1 <- generateExpression m e1
+  ge2 <- generateExpression m e2
+  be <- lift $ binary m (translateOp op) ge1 ge2
+  lift $ unary m convertUInt32ToFloat64 be
+generateExpression m (GlobalTee e) = do
+  ge <- generateExpression m e
+  (internal, _, _) <- lift getInternalNames
+  glblset <- lift $ globalSet m internal ge
+  glblget <- lift $ globalGet m internal float64
+  exprPtr <- lift $ newArray [glblset, glblget]
+  lift $ block m nullPtr exprPtr 2 float64
+generateExpression m GlobalGet = do
+  (internal, _, _) <- lift getInternalNames
+  lift $ globalGet m internal float64
+generateExpression m (GlobalSet e1 e2) = do
+  ge1 <- generateExpression m e1
+  ge2 <- generateExpression m e2
+  (internal, _, _) <- lift getInternalNames
+  glblset <- lift $ globalSet m internal ge1
+  exprPtr <- lift $ newArray [glblset, ge2]
+  lift $ block m nullPtr exprPtr 2 float64
+generateExpression m (IfStatement c l r) = do
+  cond <- generateExpression m c
+  lft <- generateExpression m l
+  rght <- generateExpression m r
+  (md, _, _) <- lift getModNames
+  condExpression <- lift $ newArray [cond]
+  conditional <- lift $ call m md condExpression 1 int32
+  lift $ if_ m conditional lft rght
+generateExpression m (ImportedFunctionCall name list) = do
+  args <- sequence (generateExpression m <$> list)
+  argsArray <- lift $ newArray args
+  cName <- lift $ newCString name
+  lift $ call m cName argsArray (Index $ fromIntegral $ length list) float64
 
 -- | Translates a list of ASTExpressions to binaryen expressions and adds them to the corresponding module of al ist of modules.
-generateExpressions :: [Module] -> [CString] -> IO [Expression]
-generateExpressions mods names = do
-  exprs <- genASTExpressions 10 5 (length names) 0.5 4
-  sequence [generateExpression m names e | (e, m) <- zip exprs mods]
+generateExpressions :: [Module] -> ReaderT (ImportedFunctions, [CString]) IO [Expression]
+generateExpressions mods = do
+  (functions, names) <- ask
+  exprs <- lift $ genASTExpressions 10 5 (length names) 0.5 4 functions
+  sequence [generateExpression m e | (e, m) <- zip exprs mods]
 
 -- | Translates an ASTExpression to a binaryen function and adds that function the given module.
-generateFunction :: Module -> [CString] -> ASTExpression -> IO Function
-generateFunction m params e = do
+generateFunction :: Module -> [CString] -> ASTExpression -> ImportedFunctions -> IO Function
+generateFunction m params e functions = do
   pool <- newPool
   namePtr <- pooledNewByteString0 pool "main"
   typePtr <- pooledNew pool none
-  expr <- generateExpression m params e
+  expr <- runReaderT (generateExpression m e) (functions, params)
   addFunction m namePtr none float64 typePtr (Index 0) expr
 
 -- | Generates a binaryen module from an ASTExpression by generating a binaryen function wiht that ASTExpression
 -- and adding that function to the default binaryen module,
-createModule :: ASTExpression -> Int -> IO Module
-createModule e params
+createModule :: ASTExpression -> Int -> ImportedFunctions -> IO Module
+createModule e params functions
   | params > 5 = error "currently a maximum of 5 parameters is allowed"
   | otherwise = do
     print params
@@ -97,7 +107,7 @@ createModule e params
     print parameters
     m <- create
     let firsts = [first | (first, _, _) <- parameters]
-    function <- generateFunction m firsts e
+    function <- generateFunction m firsts e functions
     functionName <- getName function
     _ <- addFunctionExport m functionName functionName
     let zipped = zip ([0, 1 ..] :: [CInt]) parameters
@@ -105,6 +115,8 @@ createModule e params
     addGlobalImport m fInternal sInternal tInternal float64 5
     (fMod, sMod, tMod) <- getModNames
     addFunctionImport m fMod sMod tMod float64 int32
+    functionNames <- sequence [getImportedNames name | (ImportedFunction name _) <- functions]
+    sequence_ [addFunctionImport m f s t float64 float64 | (f, s, t) <- functionNames]
     _ <- addGlobalExport m fInternal tInternal
     mapM_ (addglobal m) zipped
     return m
@@ -135,15 +147,22 @@ getInternalNames = do
 getModNames :: IO (CString, CString, CString)
 getModNames = do
   first <- newCString "mod"
-  second <- newCString "importFunctions"
+  second <- newCString "specialImports"
   third <- newCString "mod"
   return (first, second, third)
 
+getImportedNames :: String -> IO (CString, CString, CString)
+getImportedNames name = do
+  first <- newCString name
+  second <- newCString "ImportedFunctions"
+  third <- newCString name
+  return (first, second, third)
+
 -- | Generates wasm files from the given list of ASTExpression by making modules of them and printing the bytestrings to files.
-createWasmFiles :: [ASTExpression] -> Int -> IO [(ASTExpression, String)]
-createWasmFiles exprs params = do
+createWasmFiles :: [ASTExpression] -> Int -> ImportedFunctions -> IO [(ASTExpression, String)]
+createWasmFiles exprs params functions = do
   let dir = "./src/wasm/"
-  mods <- sequence [createModule e params | e <- exprs]
+  mods <- sequence [createModule e params functions | e <- exprs]
   let fileNames =
         [dir ++ "p" ++ show i ++ ".wasm" | i <- [0 .. (length mods - 1)]]
   print fileNames
@@ -162,16 +181,16 @@ createWasmFiles exprs params = do
 -- | Generates tuples of the givne ASTExpressions and its bytestring.
 -- The bytestring is generated by making a module of an ASTExpression and serializing it to wasm.
 serializeExpressions ::
-  [ASTExpression] -> Int -> IO [(ASTExpression, BS.ByteString)]
-serializeExpressions exprs params = do
-  mods <- sequence [createModule e params | e <- exprs]
+  [ASTExpression] -> Int -> ImportedFunctions -> IO [(ASTExpression, BS.ByteString)]
+serializeExpressions exprs params functions = do
+  mods <- sequence [createModule e params functions | e <- exprs]
   serializedMods <- sequence [serializeModule m | m <- mods]
   return $ zip exprs serializedMods
 
 -- | Returns the bytestring by generating a module of the given ASTExpression and serializing it to wasm.
-serializeExpression :: ASTExpression -> Int -> IO ByteString
-serializeExpression expr params = do
-  m <- createModule expr params
+serializeExpression :: ASTExpression -> Int -> ImportedFunctions -> IO BS.ByteString
+serializeExpression expr params functions = do
+  m <- createModule expr params functions
   serializeModule m
 
 -- | Writes a list of bytestrings to files at the given list of filepaths.
@@ -191,4 +210,4 @@ test = do
   let params = 1
   let e = IfStatement (Const 2) (Const 1) (Const 2)
   print e
-  createWasmFiles [e] params
+  createWasmFiles [e] params []

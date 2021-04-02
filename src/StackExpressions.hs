@@ -16,6 +16,7 @@ data StackInstruction
   | If
   | Then
   | Else
+  | Call String
   deriving (Eq)
 
 instance Show StackInstruction where
@@ -30,6 +31,7 @@ instance Show StackInstruction where
   show If = " if "
   show Then = "then"
   show Else = "else"
+  show (Call name) = "call " ++ name
 
 class ToStack a where
   toStack :: a -> InstructionSequence
@@ -49,6 +51,7 @@ instance ToStack ASTExpression where
   toStack (GlobalSet l r) = toStack l +++ Seq [GSet] +++ toStack r
   toStack GlobalGet = Seq [GGet]
   toStack (IfStatement c l r) = toStack c +++ Seq [If, Then] +++ toStack l +++ Seq [Else] +++ toStack r
+  toStack (ImportedFunctionCall name list) = foldr (+++) (Seq []) (toStack <$> list) +++ Seq [Call name]
 
 instance Show InstructionSequence where
   show (Seq []) = ""
