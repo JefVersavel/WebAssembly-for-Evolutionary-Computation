@@ -1,8 +1,10 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 605b7a449d1bab482e673fa646772f0cba79975f41b68950f032212a1573c5a4
 
 name:           wasm-alife
 version:        0.1.0.0
@@ -27,8 +29,8 @@ source-repository head
 
 library
   exposed-modules:
-      Stats
       ALife
+      Ancestor
       AST
       ASTRepresentation
       BinaryenTranslation
@@ -50,6 +52,7 @@ library
       Seeding
       SerializeUtils
       StackExpressions
+      Stats
       SysCall
       WasmGenerator
   other-modules:
@@ -76,6 +79,7 @@ library
     , language-javascript
     , matrix
     , mtl
+    , optparse-applicative
     , primes
     , random
     , split
@@ -84,5 +88,4 @@ library
     , transformers
     , tree-diff
     , vector
-    , optparse-applicative
   default-language: Haskell2010

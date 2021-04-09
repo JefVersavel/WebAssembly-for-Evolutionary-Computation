@@ -243,6 +243,3 @@ size = getNrNodes
 -- | Returns the average size of all the ASTExpressions in a given list.
 averageSize :: [ASTExpression] -> Double
 averageSize exprs = fromIntegral (sum (map size exprs)) / fromIntegral (length exprs)
-
-ancestor1 :: ASTExpression
-ancestor1 = RelOp Eq (BinOp Sub (Const 1) (Const 2)) (UnOp Abs (Param 0))
