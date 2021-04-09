@@ -79,6 +79,7 @@ instance FromJSON Output
 
 instance ToJSON Output
 
+executionTest :: IO (Maybe Output)
 executionTest = do
   bytes <- BS.readFile "./src/wasm/p1.wasm"
   executeModule bytes [1, 1, 1, 1, 1] 4

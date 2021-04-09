@@ -2,7 +2,6 @@ module SysCall where
 
 import AST
 import Seeding
-import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.Random
 

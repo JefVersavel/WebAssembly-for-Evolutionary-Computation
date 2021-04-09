@@ -1,8 +1,5 @@
 module Interaction where
 
-import AST
-import Compatibility
-import Data.Ratio
 import Organism
 
 data Interaction = Mate | Ignore

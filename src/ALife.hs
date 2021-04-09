@@ -6,7 +6,6 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
-import Compatibility
 import Control.Monad.State
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
@@ -71,8 +70,14 @@ instance Organism Creature where
   executable creature = age creature > 1
   compatible l r = double >= compatibility
     where
-      match = matchingPercentage (expression l) (expression r)
+      match = getMatchPercentage l r
       double = (fromIntegral (numerator match) :: Double) / (fromIntegral (denominator match) :: Double)
+
+getMatchPercentage :: Creature -> Creature -> Data.Ratio.Ratio Int
+getMatchPercentage l r = getEditDistance lft rght % (size lft + size rght)
+  where
+    lft = expression l
+    rght = expression r
 
 instance Show Creature where
   show (Creature e r _ a s _) =
@@ -148,6 +153,9 @@ initEnvironment gen n l s depth divider nrParam = do
   let (g1, g2) = split gen
   pop <- generateInitPop g1 s depth l divider nrParam
   initializeEnvironment n g2 pop l
+
+initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
+initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
 
 -- | Performs sun-tree mutation of the given list of creatures.
 mutateCreature :: QCGen -> Creature -> Int -> IO Creature
@@ -293,8 +301,8 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam =
       return (rest ++ [Runnable creature newPos ResourceAquirement []], newEnv)
     Right (crossoverOrg, newPos) -> do
       putStr' $
-        "the matchin percentage:"
-          ++ show (matchingPercentage (expression crossoverOrg) (expression creature))
+        "the matching percentage:"
+          ++ show (getMatchPercentage crossoverOrg creature)
       if compatible creature crossoverOrg
         then do
           print' "crossing over"

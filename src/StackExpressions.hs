@@ -65,6 +65,7 @@ getEditDistance l r = editDistance first second
 editDist :: InstructionSequence -> InstructionSequence -> Int
 editDist (Seq first) (Seq second) = editDistance first second
 
+stacktest :: IO ()
 stacktest = do
   expr <- randomGenerationTest
   let first = expr !! 7

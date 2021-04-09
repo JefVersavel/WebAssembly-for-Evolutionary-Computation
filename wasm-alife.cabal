@@ -33,7 +33,6 @@ library
       ASTRepresentation
       BinaryenTranslation
       BinaryenUtils
-      Compatibility
       Environment
       ExecuteWasm
       GeneralUtils

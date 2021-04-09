@@ -84,7 +84,7 @@ smallShow (RelOp r _ _) = show r
 smallShow (GlobalTee _) = "global.tee "
 smallShow GlobalGet = "global.get"
 smallShow (GlobalSet _ _) = "global.set"
-smallShow (IfStatement {}) = "If"
+smallShow IfStatement {} = "If"
 
 instance Show BinaryOperation where
   show Add = " + "
@@ -224,17 +224,6 @@ getNrNodes (GlobalTee e) = 1 + getNrNodes e
 getNrNodes (GlobalSet e1 e2) = 1 + getNrNodes e1 + getNrNodes e2
 getNrNodes GlobalGet = 1
 getNrNodes (IfStatement c l r) = 1 + getNrNodes c + getNrNodes l + getNrNodes r
-
--- | Returns the total number of nodes in a nAST.
-getNrNodes' :: ASTExpression -> Int
-getNrNodes' (Const _) = 2
-getNrNodes' (Param _) = 2
-getNrNodes' (UnOp _ e) = 1 + getNrNodes e
-getNrNodes' (BinOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' (RelOp _ e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' (GlobalTee e) = 2 + getNrNodes e
-getNrNodes' (GlobalSet e1 e2) = 2 + getNrNodes e1 + getNrNodes e2
-getNrNodes' GlobalGet = 2
 
 getParameters :: ASTExpression -> [Int]
 getParameters (Const _) = []
