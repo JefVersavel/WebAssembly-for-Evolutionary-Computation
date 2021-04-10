@@ -51,3 +51,27 @@ lookForSeeds = do
   let seeds = [0 .. 10]
   reproductions <- checkForReproduction seeds
   showVerticalList reproductions
+
+ancestor1 :: ASTExpression
+ancestor1 =
+  BinOp
+    Mul
+    ( GlobalSet
+        ( BinOp
+            Add
+            GlobalGet
+            (Const 1)
+        )
+        ( UnOp
+            Ceil
+            (Const 2.5)
+        )
+    )
+    ( UnOp
+        Nearest
+        ( IfStatement
+            (Param 0)
+            (UnOp Neg (BinOp Max (Param 0) (Const 4)))
+            (Const 1)
+        )
+    )

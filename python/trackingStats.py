@@ -19,7 +19,8 @@ def makeIncrementList(list, inc=True):
                 sum += e
                 sum = e
         except:
-            sum = foldl(operator.add, 0, e) / len(e) 
+            if len(e) > 0:
+                sum = foldl(operator.add, 0, e) / len(e) 
         newList.append(sum)
 
     return newList

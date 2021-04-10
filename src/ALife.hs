@@ -6,6 +6,7 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
+import Ancestor
 import Control.Monad.State
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
@@ -562,7 +563,9 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
       lim = (l, l)
   putStr "\n\n"
   print name
-  env <- initEnvironment g1 Moore lim start depth divider nrParam
+  ser <- serializeExpression ancestor1 nrParam
+  let ancestor = Creature ancestor1 0 ser 0 (-1) (-1)
+  env <- initEnvironmentAncestor g1 Moore lim ancestor
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
