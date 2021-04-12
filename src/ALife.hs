@@ -41,7 +41,8 @@ data Creature = Creature
     bytestring :: BS.ByteString,
     age :: Int,
     internalState :: Double,
-    startState :: Double
+    startState :: Double,
+    plant :: Bool
   }
   deriving (Eq, Generic)
 
@@ -81,7 +82,7 @@ getMatchPercentage l r = getEditDistance lft rght % (size lft + size rght)
     rght = expression r
 
 instance Show Creature where
-  show (Creature e r _ a s _) =
+  show (Creature e r _ a s _ p) =
     show (Rep.generateRepresentation e)
       ++ ", register= "
       ++ show r
@@ -90,6 +91,11 @@ instance Show Creature where
       ++ ", state= "
       ++ show s
       ++ "\n"
+      ++ plnt
+    where
+      plnt
+        | p = ", plant\n"
+        | otherwise = ""
 
 type GenotypePop = [(String, Int)]
 
@@ -111,18 +117,18 @@ envToLists env = map (map (Bi.first genotype')) (toLists $ grid env)
 
 -- | Ages the creature by one.
 grow :: Creature -> Creature
-grow (Creature e r b a s start) = Creature e r b (a + 1) s start
+grow (Creature e r b a s start p) = Creature e r b (a + 1) s start p
 
 -- | Returns the same creature but with age 0
 reborn :: Creature -> Creature
-reborn (Creature e r b _ _ start) = Creature e r b 0 start start
+reborn (Creature e r b _ _ start p) = Creature e r b 0 start start p
 
 -- | Changes the register to the given value.
 changeRegister :: Creature -> Double -> Creature
-changeRegister (Creature e _ b a s start) r = Creature e r b a s start
+changeRegister (Creature e _ b a s start p) r = Creature e r b a s start p
 
 changeState :: Creature -> Double -> Creature
-changeState (Creature e r b a _ start) s = Creature e r b a s start
+changeState (Creature e r b a _ start p) s = Creature e r b a s start p
 
 -- | Generates an initial population of creatures with and a bound for the initial i
 -- value of the registers of the creatures and the limits of the environment.
@@ -140,7 +146,7 @@ generateInitPop gen start depth lim divider nrParam = do
       let starts = generateStart gg s start
       let states = generateStart ggg s start
       serializeds <- serializeExpressions ex nrParam
-      return [Creature e st b 0 sta sta | (e, st, b, sta) <- List.zip4 ex starts (map snd serializeds) states]
+      return [Creature e st b 0 sta sta False | (e, st, b, sta) <- List.zip4 ex starts (map snd serializeds) states]
 
 -- | Generates a list of random values for the registers of the creatures
 -- with a given bound and size of that list.
@@ -164,7 +170,15 @@ mutateCreature gen creature nrParam = do
   let r = register creature
   e <- subTreeMutation gen (expression creature) nrParam
   serialized <- serializeExpression e nrParam
-  return $ Creature e r serialized (age creature) (internalState creature) (startState creature)
+  return $
+    Creature
+      e
+      r
+      serialized
+      (age creature)
+      (internalState creature)
+      (startState creature)
+      (null (getParameters e))
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> [Resource] -> IO Creature
@@ -254,7 +268,8 @@ executeAction ::
 executeAction _ env [] _ _ _ = return ([], env)
 executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutationRate nrParam = do
   print' out
-  syscall <- liftIO $ decideSysCall out (expression $ organism x)
+  syscall <- liftIO $ decideSysCall out (expression $ organism x) (plant creature)
+  print' $ "creature is a plant: " ++ show (plant creature)
   case syscall of
     Reproduction -> do
       print' "reproducing"
@@ -334,14 +349,16 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam =
                   0
                   (startState creature)
                   (startState creature)
+                  (null (getParameters leftChild))
               rght =
                 Creature
                   rightChild
                   (register crossoverOrg)
                   rightSer
                   0
-                  (startState creature)
-                  (startState creature)
+                  (startState crossoverOrg)
+                  (startState crossoverOrg)
+                  (null (getParameters rightChild))
               newEnv = insertOrganismAt (insertOrganismAt env lft lPos) rght rPos
               leftRunnable = Runnable lft lPos ResourceAquirement []
               rightRunnable = Runnable lft rPos ResourceAquirement []
@@ -529,6 +546,19 @@ calculateDiversity envs = matchPercentages <$> stacks
     creatures = getAllOrgs <$> envs
     stacks = (creatureToStack <$>) <$> creatures
 
+calculateAncestorDiversity :: [Environment Creature] -> InstructionSequence -> Int -> [[Double]]
+calculateAncestorDiversity envs anc len =
+  ( ( \(sq, l) ->
+        1
+          - (fromIntegral (editDist sq anc) / fromIntegral (l + len))
+    )
+      <$>
+  )
+    <$> stacks
+  where
+    creatures = getAllOrgs <$> envs
+    stacks = (creatureToStack <$>) <$> creatures
+
 matchPercentages :: [(InstructionSequence, Int)] -> [Double]
 matchPercentages [] = []
 matchPercentages [_] = []
@@ -564,7 +594,8 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
   putStr "\n\n"
   print name
   ser <- serializeExpression ancestor1 nrParam
-  let ancestor = Creature ancestor1 0 ser 0 (-1) (-1)
+  let ancestor = Creature ancestor1 0 ser 0 (-1) (-1) False
+      ancStack = toStack ancestor1
   env <- initEnvironmentAncestor g1 Moore lim ancestor
   print "Init"
   print env
@@ -578,6 +609,7 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
           (length . getParameters . expression)
           (calculateDiversity envList)
           age
+          (calculateAncestorDiversity envList ancStack (size ancestor1))
   -- serialize these stats
   let trackingDirectory = "./trackingStats/"
   let postDirectory = "./postStats/"
@@ -589,4 +621,10 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 6546 10 10000 5 6 4 10 1
+  mainCreature 646 10 10000 5 6 4 10 1
+  mainCreature 654 10 10000 5 6 4 10 1
+  mainCreature 66 10 10000 5 6 4 10 1
+  mainCreature 6 10 10000 5 6 4 10 1
+  mainCreature 65 10 10000 5 6 4 10 1
+  mainCreature 54 10 10000 5 6 4 10 1
+  mainCreature 46 10 10000 5 6 4 10 1

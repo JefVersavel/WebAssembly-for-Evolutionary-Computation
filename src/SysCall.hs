@@ -22,12 +22,18 @@ toSysCall n = toEnum (round (abs n) `rem` s)
   where
     s = length [minBound :: SysCall .. maxBound]
 
-decideSysCall :: Double -> ASTExpression -> IO SysCall
-decideSysCall n expr =
-  generate $
-    useSeed gen $
-      frequency
-        [(sze, return Reproduction), (sze - dpth, elements [Up, Down, Rght, Lft]), (dpth, return None)]
+decideSysCall :: Double -> ASTExpression -> Bool -> IO SysCall
+decideSysCall n expr plnt
+  | plnt =
+    generate $
+      useSeed gen $
+        frequency
+          [(sze, return Reproduction), (dpth, return None)]
+  | otherwise =
+    generate $
+      useSeed gen $
+        frequency
+          [(sze, return Reproduction), (sze - dpth, elements [Up, Down, Rght, Lft]), (dpth, return None)]
   where
     gen = mkQCGen $ round n
     dpth = getMaxDepth expr
