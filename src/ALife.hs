@@ -621,7 +621,6 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
 
 testCreature :: IO ()
 testCreature = do
-  mainCreature 646 10 10000 5 6 4 10 1
   mainCreature 654 10 10000 5 6 4 10 1
   mainCreature 66 10 10000 5 6 4 10 1
   mainCreature 6 10 10000 5 6 4 10 1
