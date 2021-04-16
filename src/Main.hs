@@ -1,53 +1,27 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import ALife
-import qualified Data.ByteString.Lazy as B
-import Data.Csv as C
-import Data.List.Split
-import qualified Data.Vector as V
-import GHC.Generics
-import System.Directory
+import AST
+import Ancestor
 
-data TestData = TestData
-  { seed :: Int,
-    start :: Double,
-    iterations :: Int,
-    limits :: Int,
-    depth :: Int,
-    mutationRate :: Int,
-    divider :: Int
-  }
-  deriving (Show, Generic)
+seeds :: [Int]
+seeds = [7 .. 10]
 
-instance FromRecord TestData
+ancestorCombos :: [(ASTExpression, Double)]
+ancestorCombos = [(ancestor1, start1)]
 
-instance ToRecord TestData
+limitations :: [Int]
+limitations = [5, 10 .. 25]
 
-executeTestdata :: [TestData] -> IO ()
-executeTestdata [] = return ()
-executeTestdata (TestData se st it li de mu di : rest) = do
-  mainCreature se st it li de mu di 1
-  executeTestdata rest
+mutationRates :: [Int]
+mutationRates = [2 .. 10] ++ [15, 20]
 
-runMultipleFiles :: [FilePath] -> IO ()
-runMultipleFiles [] = return ()
-runMultipleFiles (f : rest)
-  | last (splitOn "." f) == "csv" = do
-    putStr "\n\n\n\n\n\n"
-    putStr f
-    file <- B.readFile $ "./csv/" ++ f
-    let decoded = decode HasHeader file :: Either String (V.Vector TestData)
-    case decoded of
-      Left str -> print str
-      Right v -> do
-        executeTestdata $ V.toList v
-        runMultipleFiles rest
-  | otherwise = runMultipleFiles rest
-
-main :: IO ()
+main :: IO [()]
 main = do
-  contents <- listDirectory "./csv"
-  runMultipleFiles contents
+  sequence
+    [ mainCreature seed anc start 10000 l mut 5
+      | (anc, start) <- ancestorCombos,
+        l <- limitations,
+        seed <- seeds,
+        mut <- mutationRates
+    ]

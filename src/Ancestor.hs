@@ -52,6 +52,27 @@ lookForSeeds = do
   reproductions <- checkForReproduction seeds
   showVerticalList reproductions
 
+getSizesDepths :: IO ()
+getSizesDepths = do
+  print "ancestor1"
+  print $ size ancestor1
+  print $ getMaxDepth ancestor1
+  print "ancestor2"
+  print $ size ancestor2
+  print $ getMaxDepth ancestor2
+  print "ancestor3"
+  print $ size ancestor3
+  print $ getMaxDepth ancestor3
+  print "ancestor4"
+  print $ size ancestor4
+  print $ getMaxDepth ancestor4
+  print "ancestor6"
+  print $ size ancestor6
+  print $ getMaxDepth ancestor6
+
+start1 :: Double
+start1 = -1
+
 ancestor1 :: ASTExpression
 ancestor1 =
   BinOp
@@ -73,5 +94,120 @@ ancestor1 =
             (Param 0)
             (UnOp Neg (BinOp Max (Param 0) (Const 4)))
             (Const 1)
+        )
+    )
+
+start2 :: Double
+start2 = -1
+
+ancestor2 :: ASTExpression
+ancestor2 =
+  BinOp
+    Sub
+    ( GlobalSet
+        ( BinOp
+            Add
+            GlobalGet
+            (Const 1)
+        )
+        ( BinOp
+            Add
+            (Const 2.5)
+            (Param 0)
+        )
+    )
+    ( UnOp
+        Floor
+        ( IfStatement
+            (Param 1)
+            (Const 10)
+            (UnOp Neg (BinOp Mul (Param 0) (Const 1.6)))
+        )
+    )
+
+start3 :: Double
+start3 = 1
+
+ancestor3 :: ASTExpression
+ancestor3 =
+  BinOp
+    Max
+    ( GlobalSet
+        ( BinOp
+            Mul
+            GlobalGet
+            (Const 3)
+        )
+        ( UnOp
+            Ceil
+            (BinOp Copysign (Const 5) (Param 0))
+        )
+    )
+    ( UnOp
+        Nearest
+        ( IfStatement
+            (Param 0)
+            (UnOp Neg (BinOp Max (Param 0) (Const 4)))
+            (Const 1)
+        )
+    )
+
+start4 :: Double
+start4 = 1
+
+ancestor4 :: ASTExpression
+ancestor4 =
+  BinOp
+    Add
+    ( GlobalSet
+        ( BinOp
+            Add
+            GlobalGet
+            (Const 2)
+        )
+        ( BinOp
+            Add
+            (Const 2.5)
+            (Param 0)
+        )
+    )
+    ( UnOp
+        Floor
+        ( IfStatement
+            (BinOp Max (Const 45) (Param 1))
+            (Const 10)
+            (UnOp Neg (BinOp Mul (Param 0) (Const 1.6)))
+        )
+    )
+
+start6 :: Double
+start6 = 5
+
+ancestor6 :: ASTExpression
+ancestor6 =
+  BinOp
+    Add
+    ( GlobalSet
+        ( BinOp
+            Add
+            GlobalGet
+            (Const 1)
+        )
+        ( BinOp
+            Min
+            (Const 2.5)
+            (Param 1)
+        )
+    )
+    ( IfStatement
+        (Param 0)
+        (UnOp Neg (BinOp Max (Param 0) (Const 4)))
+        ( BinOp
+            Max
+            (Const 1)
+            ( UnOp
+                Ceil
+                (BinOp Sub (Param 1) (Param 0))
+            )
         )
     )

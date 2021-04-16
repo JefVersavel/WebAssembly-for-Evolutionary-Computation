@@ -183,9 +183,6 @@ executeCreature creature res = do
       return $ changeState (changeRegister creature $ outcome out) $ internal out
     Nothing -> error "execution has failed"
 
-mutationChance :: Int
-mutationChance = 4
-
 distributeParams :: [Double] -> [(Int, Double)] -> [Double]
 distributeParams list [] = list
 distributeParams list ((i, d) : rest) = distributeParams (f ++ [d] ++ tail l) rest
@@ -543,29 +540,14 @@ creatureToStack org =
    in (Seq stack, length stack)
 
 -- | The main function.
-mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> IO ()
-mainCreature seed start iterations l depth mutationRate divider nrParam = do
-  let name =
-        "seed= " ++ show seed
-          ++ "_iterations= "
-          ++ show iterations
-          ++ "_limit= "
-          ++ show l
-          ++ "_maxDepth= "
-          ++ show depth
-          ++ "_mutationRate= "
-          ++ show mutationRate
-          ++ "_divider= "
-          ++ show divider
-          ++ "_nrParam= "
-          ++ show nrParam
-      (g1, g2) = split $ mkQCGen seed
+mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor start iterations l mutationRate nrParam = do
+  let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
-  print name
-  ser <- serializeExpression ancestor1 nrParam
-  let ancestor = Creature ancestor1 0 ser 0 (-1) (-1)
-  env <- initEnvironmentAncestor g1 Moore lim ancestor
+  ser <- serializeExpression ancestor nrParam
+  let anc = Creature ancestor 0 ser 0 start start
+  env <- initEnvironmentAncestor g1 Moore lim anc
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -583,10 +565,19 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
   let postDirectory = "./postStats/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
+  let name =
+        "seed= " ++ show seed
+          ++ "_iterations= "
+          ++ show iterations
+          ++ "_limit= "
+          ++ show l
+          ++ "_mutationRate= "
+          ++ show mutationRate
+          ++ "_nrParam= "
+          ++ show nrParam
+          ++ "_ancestor= "
+          ++ genotype anc
+  print name
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
   serialize (env : envList) name
-
-testCreature :: IO ()
-testCreature = do
-  mainCreature 6546 10 10000 5 6 4 10 1
