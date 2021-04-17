@@ -8,7 +8,7 @@ seeds :: [Int]
 seeds = [7 .. 10]
 
 ancestorCombos :: [(ASTExpression, Double)]
-ancestorCombos = [(ancestor1, start1)]
+ancestorCombos = [(ancestor4, start4)]
 
 limitations :: [Int]
 limitations = [5, 10 .. 25]
