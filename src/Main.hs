@@ -5,13 +5,13 @@ import AST
 import Ancestor
 
 seeds :: [Int]
-seeds = [7 .. 10]
+seeds = [1 .. 10]
 
 ancestorCombos :: [(ASTExpression, Double)]
-ancestorCombos = [(ancestor4, start4)]
+ancestorCombos = [(ancestor6, start6)]
 
 limitations :: [Int]
-limitations = [5, 10 .. 25]
+limitations = [10, 15 .. 25]
 
 mutationRates :: [Int]
 mutationRates = [2 .. 10] ++ [15, 20]

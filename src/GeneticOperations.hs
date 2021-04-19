@@ -168,7 +168,7 @@ subTreeMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
 subTreeMutation g1 e nrParam = do
   let (p, g2) = selectGenOpPoint g1 e
   let maxD = getMaxDepth $ getSubExpression p e
-  subTree <- generateSubTree g2 maxD nrParam
+  subTree <- generateSubTree g2 (maxD * 2) nrParam
   return $ insertSubExpression p e subTree
 
 -- | Perfroms reproduction which just returns the given expression.
