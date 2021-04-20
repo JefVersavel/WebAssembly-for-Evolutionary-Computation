@@ -6,7 +6,6 @@ module ALife where
 
 import AST
 import qualified ASTRepresentation as Rep
-import Ancestor
 import Control.Monad.State
 import Data.Aeson
 import qualified Data.Bifunctor as Bi
@@ -539,6 +538,19 @@ creatureToStack org =
       (Seq stack) = toStack ex
    in (Seq stack, length stack)
 
+calculateAncestorDiversity :: [Environment Creature] -> InstructionSequence -> Int -> [[Double]]
+calculateAncestorDiversity envs anc len =
+  ( ( \(sq, l) ->
+        1
+          - (fromIntegral (editDist sq anc) / fromIntegral (l + len))
+    )
+      <$>
+  )
+    <$> stacks
+  where
+    creatures = getAllOrgs <$> envs
+    stacks = (creatureToStack <$>) <$> creatures
+
 -- | The main function.
 mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> IO ()
 mainCreature seed ancestor start iterations l mutationRate nrParam = do
@@ -547,6 +559,7 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
   putStr "\n\n"
   ser <- serializeExpression ancestor nrParam
   let anc = Creature ancestor 0 ser 0 start start
+      ancStack = toStack ancestor
   env <- initEnvironmentAncestor g1 Moore lim anc
   print "Init"
   print env
@@ -560,6 +573,7 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
           (length . getParameters . expression)
           (calculateDiversity envList)
           age
+          (calculateAncestorDiversity envList ancStack (size ancestor))
   -- serialize these stats
   let trackingDirectory = "./trackingStats/"
   let postDirectory = "./postStats/"
@@ -571,7 +585,7 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
           ++ show iterations
           ++ "_limit= "
           ++ show l
-          ++ "_mutationRate= "
+          ++ "_subTreeMutationRate= "
           ++ show mutationRate
           ++ "_nrParam= "
           ++ show nrParam

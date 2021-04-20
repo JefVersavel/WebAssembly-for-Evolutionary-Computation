@@ -30,7 +30,8 @@ data PostStats = PostStats
     diversity :: [[Double]],
     ages :: Post,
     resourceGrowth :: Tracking,
-    popGrowth :: Tracking
+    popGrowth :: Tracking,
+    ancestorDiff :: [[Double]]
   }
   deriving (Show, Generic, ToJSON)
 
@@ -92,6 +93,7 @@ postCalculation ::
   (a -> Int) ->
   [[Double]] ->
   (a -> Int) ->
+  [[Double]] ->
   PostStats
 postCalculation env sizeCalc depthCalc paramCalc divers ageCalc =
   PostStats

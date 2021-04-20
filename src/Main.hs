@@ -8,10 +8,10 @@ seeds :: [Int]
 seeds = [1 .. 10]
 
 ancestorCombos :: [(ASTExpression, Double)]
-ancestorCombos = [(ancestor6, start6)]
+ancestorCombos = [(ancestor1, start1)]
 
 limitations :: [Int]
-limitations = [10, 15 .. 25]
+limitations = [10, 15, 20, 25]
 
 mutationRates :: [Int]
 mutationRates = [2 .. 10] ++ [15, 20]
