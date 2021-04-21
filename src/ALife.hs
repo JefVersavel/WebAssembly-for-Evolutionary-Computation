@@ -160,10 +160,17 @@ initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature
 -- | Performs sun-tree mutation of the given list of creatures.
 mutateCreature :: QCGen -> Creature -> Int -> IO Creature
 mutateCreature gen creature nrParam = do
+  let (ran, g) = randomR (True, False) gen
   let r = register creature
-  e <- subTreeMutation gen (expression creature) nrParam
-  serialized <- serializeExpression e nrParam
-  return $ Creature e r serialized (age creature) (internalState creature) (startState creature)
+  if ran
+    then do
+      e <- pointMutation g (expression creature) nrParam
+      serialized <- serializeExpression e nrParam
+      return $ Creature e r serialized (age creature) (internalState creature) (startState creature)
+    else do
+      e <- subTreeMutation g (expression creature) nrParam
+      serialized <- serializeExpression e nrParam
+      return $ Creature e r serialized (age creature) (internalState creature) (startState creature)
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
 executeCreature :: Creature -> [Resource] -> IO Creature
@@ -580,13 +587,14 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "seed= " ++ show seed
+        "_halfMixedMutationRate= "
+          ++ show mutationRate
+          ++ "seed= "
+          ++ show seed
           ++ "_iterations= "
           ++ show iterations
           ++ "_limit= "
           ++ show l
-          ++ "_subTreeMutationRate= "
-          ++ show mutationRate
           ++ "_nrParam= "
           ++ show nrParam
           ++ "_ancestor= "

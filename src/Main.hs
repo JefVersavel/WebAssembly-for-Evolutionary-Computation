@@ -5,16 +5,16 @@ import AST
 import Ancestor
 
 seeds :: [Int]
-seeds = [1 .. 10]
+seeds = [1 .. 3]
 
 ancestorCombos :: [(ASTExpression, Double)]
 ancestorCombos = [(ancestor1, start1)]
 
 limitations :: [Int]
-limitations = [10, 15, 20, 25]
+limitations = [10]
 
 mutationRates :: [Int]
-mutationRates = [2 .. 10] ++ [15, 20]
+mutationRates = [2 .. 10]
 
 main :: IO [()]
 main = do
