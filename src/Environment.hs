@@ -453,7 +453,7 @@ initializeEnvironment n gen orgList lim = do
   let posList = map fst posOrgs
   let env = fillInOrgs (empty lim n) posOrgs
   let amount = floor (fromIntegral (getSize env) :: Double)
-  let resources = generateResources g1 amount 1
+  let resources = generateResources g1 amount 5
   let (g21, g22) = R.split g2
   print "ok we got here"
   let extraRes = generateResourcesFixed g21 (length posList) 10

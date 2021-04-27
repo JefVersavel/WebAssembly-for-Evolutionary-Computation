@@ -8,7 +8,7 @@ seeds :: [Int]
 seeds = [1 .. 3]
 
 ancestorCombos :: [(ASTExpression, Double)]
-ancestorCombos = [(ancestor1, start1)]
+ancestorCombos = [(ancestor1, start1), (ancestor2, start2), (ancestor6, start6)]
 
 limitations :: [Int]
 limitations = [10]
@@ -19,9 +19,8 @@ mutationRates = [2 .. 10]
 main :: IO [()]
 main = do
   sequence
-    [ mainCreature seed anc start 10000 l mut 5
-      | (anc, start) <- ancestorCombos,
-        l <- limitations,
+    [ mainCreature seed ancestor1 ancestor2 start1 start2 10000 l mut 5
+      | l <- limitations,
         seed <- seeds,
         mut <- mutationRates
     ]

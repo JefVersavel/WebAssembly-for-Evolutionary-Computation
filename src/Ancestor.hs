@@ -98,7 +98,7 @@ ancestor1 =
     )
 
 start2 :: Double
-start2 = -1
+start2 = 0
 
 ancestor2 :: ASTExpression
 ancestor2 =

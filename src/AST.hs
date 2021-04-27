@@ -45,7 +45,14 @@ instance Serialize ASTExpression
 instance ToJSON ASTExpression
 
 -- | Internal representation of a binary operation.
-data BinaryOperation = Add | Sub | Mul | Div | Min | Max | Copysign
+data BinaryOperation
+  = Add
+  | Sub
+  | Mul
+  | Div
+  | Min
+  | Max
+  | Copysign
   deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize BinaryOperation
@@ -55,7 +62,14 @@ instance ToJSON BinaryOperation
 instance ToExpr BinaryOperation
 
 -- | Internal representation of a unary operation.
-data UnaryOperation = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
+data UnaryOperation
+  = Abs
+  | Neg
+  | Sqrt
+  | Ceil
+  | Floor
+  | Trunc
+  | Nearest
   deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize UnaryOperation
@@ -65,7 +79,13 @@ instance ToJSON UnaryOperation
 instance ToExpr UnaryOperation
 
 -- | Internal representation of a relational operation.
-data RelationalOperation = Eq | Ne | Lt | Gt | Le | Ge
+data RelationalOperation
+  = Eq
+  | Ne
+  | Lt
+  | Gt
+  | Le
+  | Ge
   deriving (Enum, Eq, Bounded, Generic)
 
 instance Serialize RelationalOperation

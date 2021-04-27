@@ -157,6 +157,9 @@ initEnvironment gen n l s depth divider nrParam = do
 initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
 initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
 
+initEnvironmentEmpty :: QCGen -> Neighbourhood -> Lim -> IO (Environment Creature)
+initEnvironmentEmpty gen n l = initializeEnvironment n gen [] l
+
 -- | Performs sun-tree mutation of the given list of creatures.
 mutateCreature :: QCGen -> Creature -> Int -> IO Creature
 mutateCreature gen creature nrParam = do
@@ -559,15 +562,18 @@ calculateAncestorDiversity envs anc len =
     stacks = (creatureToStack <$>) <$> creatures
 
 -- | The main function.
-mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> IO ()
-mainCreature seed ancestor start iterations l mutationRate nrParam = do
+mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam = do
   let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
-  ser <- serializeExpression ancestor nrParam
-  let anc = Creature ancestor 0 ser 0 start start
-      ancStack = toStack ancestor
-  env <- initEnvironmentAncestor g1 Moore lim anc
+  ser1 <- serializeExpression ancestor1 nrParam
+  ser2 <- serializeExpression ancestor2 nrParam
+  let anc1 = Creature ancestor1 0 ser1 0 start1 start1
+      ancStack1 = toStack ancestor1
+      anc2 = Creature ancestor2 0 ser2 0 start2 start2
+      ancStack2 = toStack ancestor2
+  env <- initializeEnvironment Moore g1 [anc1, anc2] lim
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -580,25 +586,28 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
           (length . getParameters . expression)
           (calculateDiversity envList)
           age
-          (calculateAncestorDiversity envList ancStack (size ancestor))
+          (calculateAncestorDiversity envList ancStack1 (size ancestor1))
+          (calculateAncestorDiversity envList ancStack2 (size ancestor2))
   -- serialize these stats
   let trackingDirectory = "./trackingStats/"
   let postDirectory = "./postStats/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "_halfMixedMutationRate= "
-          ++ show mutationRate
-          ++ "seed= "
+        "ancestor1= "
+          ++ genotype anc1
+          ++ "_ancestor2= "
+          ++ genotype anc2
+          ++ "_seed= "
           ++ show seed
+          ++ "_halfMixedMutationRate= "
+          ++ show mutationRate
           ++ "_iterations= "
           ++ show iterations
           ++ "_limit= "
           ++ show l
           ++ "_nrParam= "
           ++ show nrParam
-          ++ "_ancestor= "
-          ++ genotype anc
   print name
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
