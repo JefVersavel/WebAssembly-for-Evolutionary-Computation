@@ -69,5 +69,4 @@ def makeCharts(dir, inc=True):
         saveImages(data, names)
 
 
-makeCharts("../trackingStats")
-makeCharts("../postStats", False)
+makeCharts("../subtreemutationtests/post", False)

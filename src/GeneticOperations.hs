@@ -164,11 +164,11 @@ generateSubTree g1 maxD nrParam
     generateExpr method = generate $ runReader (method g3) (d, nrParam)
 
 -- | Performs sub-tree mutation which is achieved by randomly replacing a sub-tree of an expression by another randomly generated sub-tree.
-subTreeMutation :: QCGen -> ASTExpression -> Int -> IO ASTExpression
-subTreeMutation g1 e nrParam = do
+subTreeMutation :: QCGen -> ASTExpression -> Int -> Double -> IO ASTExpression
+subTreeMutation g1 e nrParam ratio = do
   let (p, g2) = selectGenOpPoint g1 e
-  let maxD = getMaxDepth $ getSubExpression p e
-  subTree <- generateSubTree g2 (maxD * 2) nrParam
+  let maxD = (fromIntegral $ getMaxDepth $ getSubExpression p e) :: Double
+  subTree <- generateSubTree g2 (round $ maxD * ratio) nrParam
   return $ insertSubExpression p e subTree
 
 -- | Perfroms reproduction which just returns the given expression.
