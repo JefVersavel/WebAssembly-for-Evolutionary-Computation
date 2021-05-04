@@ -160,7 +160,7 @@ generateSubTree g1 maxD nrParam
   | otherwise = generateExpr fullOneInit
   where
     (grow, g2) = randomR (True, False) g1
-    (d, g3) = randomR (0, maxD) g2
+    (d, g3) = randomR (0, maxD * 2) g2
     generateExpr method = generate $ runReader (method g3) (d, nrParam)
 
 -- | Performs sub-tree mutation which is achieved by randomly replacing a sub-tree of an expression by another randomly generated sub-tree.

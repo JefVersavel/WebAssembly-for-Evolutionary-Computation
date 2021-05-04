@@ -132,9 +132,9 @@ generateInitPop gen start depth lim divider nrParam = do
   if nrParam > 5
     then error "the number of parameters cannot be bigger than 5"
     else do
-      let s = uncurry (*) lim `div` divider + 1
+      let s = 1
       let (g1, g2) = split gen
-      ex <- sequence [generate g | g <- rampedHalfNHalf g1 depth nrParam 0.5 s]
+      ex <- sequence $ take s $ [generate g | g <- rampedHalfNHalf g1 depth nrParam 0.5 2]
       let (gg, ggg) = split g2
       let starts = generateStart gg s start
       let states = generateStart ggg s start
@@ -148,14 +148,14 @@ generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> IO (Environment Creature)
-initEnvironment gen n l s depth divider nrParam = do
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> Int -> IO (Environment Creature)
+initEnvironment gen n l s depth divider nrParam start = do
   let (g1, g2) = split gen
   pop <- generateInitPop g1 s depth l divider nrParam
-  initializeEnvironment n g2 pop l
+  initializeEnvironment n g2 pop l start
 
-initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
-initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
+-- initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
+-- initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
 
 -- | Performs sun-tree mutation of the given list of creatures.
 mutateCreature :: QCGen -> Creature -> Int -> IO Creature
@@ -542,10 +542,13 @@ creatureToStack org =
    in (Seq stack, length stack)
 
 -- | The main function.
-mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> IO ()
-mainCreature seed start iterations l depth mutationRate divider nrParam = do
+mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed start iterations l depth mutationRate divider nrParam startRes = do
   let name =
-        "seed= " ++ show seed
+        "quadruple "
+          ++ show startRes
+          ++ " seed= "
+          ++ show seed
           ++ "_iterations= "
           ++ show iterations
           ++ "_limit= "
@@ -562,7 +565,7 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
       lim = (l, l)
   putStr "\n\n"
   print name
-  env <- initEnvironment g1 Moore lim start depth divider nrParam
+  env <- initEnvironment g1 Moore lim start depth divider nrParam startRes
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -583,7 +586,3 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
   serialize (env : envList) name
-
-testCreature :: IO ()
-testCreature = do
-  mainCreature 6546 10 10000 5 6 4 10 1
