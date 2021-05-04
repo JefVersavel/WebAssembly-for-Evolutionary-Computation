@@ -21,6 +21,8 @@ def makeIncrementList(list, inc=True):
         except:
             if len(e) > 0:
                 sum = foldl(operator.add, 0, e) / len(e) 
+            else:
+                sum = 0
         newList.append(sum)
 
     return newList
@@ -79,15 +81,13 @@ def makeCharts(dir, inc=True):
             depth = getDepth(name)
             print(depth)
 
-            newDir = dir + "/dir_" + name
-            os.makedirs(newDir, exist_ok=True)
             normalData = file.get(title)
-            label = "depth multiplyer= " + depth
+            label = "m= " + depth
             incData = makeIncrementList(normalData, inc)
             plt.plot(incData, label=label)
 
         plt.legend()
-        plt.savefig("subTreeMutationExperiment_" + title)
+        plt.savefig("subTreeMutationExperiment5_" + title)
         print("file created")
         plt.close("all")
 
