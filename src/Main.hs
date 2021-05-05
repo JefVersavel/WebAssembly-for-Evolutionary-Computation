@@ -22,7 +22,7 @@ subTreeDepths = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
 main :: IO [()]
 main = do
   sequence
-    [ mainCreature seed anc start 1000 l mut 5 depth
+    [ mainCreature seed anc start 10000 l mut 5 depth
       | (anc, start) <- ancestorCombos,
         l <- limitations,
         seed <- seeds,
