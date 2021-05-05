@@ -5,7 +5,7 @@ import AST
 import Ancestor
 
 seeds :: [Int]
-seeds = [1 .. 10]
+seeds = [1 .. 50]
 
 ancestorCombos :: [(ASTExpression, Double)]
 ancestorCombos =

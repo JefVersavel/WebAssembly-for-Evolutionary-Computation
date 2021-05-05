@@ -580,20 +580,14 @@ mainCreature seed ancestor start iterations l mutationRate nrParam startRes = do
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "ancestor "
+        "only ancestor "
+          ++ genotype anc
+          ++ " "
           ++ show startRes
-          ++ "seed= "
+          ++ " seed= "
           ++ show seed
           ++ "_iterations= "
           ++ show iterations
-          ++ "_limit= "
-          ++ show l
-          ++ "_subTreeMutationRate= "
-          ++ show mutationRate
-          ++ "_nrParam= "
-          ++ show nrParam
-          ++ "_ancestor= "
-          ++ genotype anc
   print name
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
