@@ -446,21 +446,23 @@ initializeEnvironment ::
   QCGen ->
   [a] ->
   Lim ->
+  Int ->
   IO (Environment a)
-initializeEnvironment n gen orgList lim = do
+initializeEnvironment n gen orgList lim start = do
   let (g1, g2) = R.split gen
   posOrgs <- distribute gen orgList lim
   let posList = map fst posOrgs
   let env = fillInOrgs (empty lim n) posOrgs
   let amount = floor (fromIntegral (getSize env) :: Double)
-  let resources = generateResources g1 amount 1
+  let resources = generateResources g1 amount start
   let (g21, g22) = R.split g2
   print "ok we got here"
   let extraRes = generateResourcesFixed g21 (length posList) 10
   posRes <- distribute g22 resources lim
   let newEnv = fillInResources env posRes
-  let extraResEnv = fillInResources newEnv $ zip posList extraRes
-  return extraResEnv
+  -- let extraResEnv = fillInResources newEnv $ zip posList extraRes
+  -- return extraResEnv
+  return newEnv
 
 -- generateResourcesPos :: QCGen -> [Pos] -> Int -> [(Pos, [Resource])]
 -- generateResourcesPos gen [] _ []

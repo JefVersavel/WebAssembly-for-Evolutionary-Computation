@@ -148,13 +148,13 @@ generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> IO (Environment Creature)
-initEnvironment gen n l s depth divider nrParam = do
+initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> Int -> IO (Environment Creature)
+initEnvironment gen n l s depth divider nrParam start = do
   let (g1, g2) = split gen
   pop <- generateInitPop g1 s depth l divider nrParam
-  initializeEnvironment n g2 pop l
+  initializeEnvironment n g2 pop l start
 
-initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
+initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> Int -> IO (Environment Creature)
 initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
 
 -- | Performs sun-tree mutation of the given list of creatures.
@@ -552,15 +552,15 @@ calculateAncestorDiversity envs anc len =
     stacks = (creatureToStack <$>) <$> creatures
 
 -- | The main function.
-mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> IO ()
-mainCreature seed ancestor start iterations l mutationRate nrParam = do
+mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor start iterations l mutationRate nrParam startRes = do
   let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
   ser <- serializeExpression ancestor nrParam
   let anc = Creature ancestor 0 ser 0 start start
       ancStack = toStack ancestor
-  env <- initEnvironmentAncestor g1 Moore lim anc
+  env <- initEnvironmentAncestor g1 Moore lim anc startRes
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -580,7 +580,10 @@ mainCreature seed ancestor start iterations l mutationRate nrParam = do
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "seed= " ++ show seed
+        "ancestor "
+          ++ show startRes
+          ++ "seed= "
+          ++ show seed
           ++ "_iterations= "
           ++ show iterations
           ++ "_limit= "
