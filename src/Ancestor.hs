@@ -211,3 +211,21 @@ ancestor6 =
             )
         )
     )
+
+generator1 :: ASTExpression
+generator1 =
+  GlobalSet
+    (Const 2)
+    (Const 1)
+
+generatorStart1 :: Double
+generatorStart1 = 2
+
+generator2 :: ASTExpression
+generator2 =
+  GlobalSet
+    (BinOp Add GlobalGet (Const 1))
+    (UnOp Ceil (Const 2))
+
+generatorStart2 :: Double
+generatorStart2 = 0
