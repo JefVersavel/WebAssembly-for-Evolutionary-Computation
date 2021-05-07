@@ -161,11 +161,11 @@ initEnvironmentEmpty :: QCGen -> Neighbourhood -> Lim -> IO (Environment Creatur
 initEnvironmentEmpty gen n l = initializeEnvironment n gen [] l
 
 -- | Performs sun-tree mutation of the given list of creatures.
-mutateCreature :: QCGen -> Creature -> Int -> IO Creature
-mutateCreature gen creature nrParam = do
-  let (ran, g) = randomR (True, False) gen
+mutateCreature :: QCGen -> Creature -> Int -> Int -> IO Creature
+mutateCreature gen creature nrParam ratio = do
+  let (ran, g) = randomR (1 :: Int, 4) gen
   let r = register creature
-  if ran
+  if ran <= ratio
     then do
       e <- pointMutation g (expression creature) nrParam
       serialized <- serializeExpression e nrParam
@@ -206,9 +206,10 @@ reproduce ::
   [Runnable Creature] ->
   Int ->
   Int ->
+  Int ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-reproduce _ env [] _ _ = return ([], env)
-reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
+reproduce _ env [] _ _ _ = return ([], env)
+reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam ratio = do
   let nils = getNilNeighbours env pos
       newCreature = reborn creature
       (g1, g2) = split gen
@@ -224,7 +225,7 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
       print' "mutate"
       stats <- get
       put $ addMutation stats
-      mutated <- liftIO $ mutateCreature g3 newCreature nrParam
+      mutated <- liftIO $ mutateCreature g3 newCreature nrParam ratio
       print' "this is the child"
       putStr' $ show mutated
       return
@@ -256,9 +257,10 @@ executeAction ::
   Double ->
   Int ->
   Int ->
+  Int ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-executeAction _ env [] _ _ _ = return ([], env)
-executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutationRate nrParam = do
+executeAction _ env [] _ _ _ _ = return ([], env)
+executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutationRate nrParam ratio = do
   print' out
   syscall <- liftIO $ decideSysCall out (expression $ organism x)
   case syscall of
@@ -266,7 +268,7 @@ executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutatio
       print' "reproducing"
       stats <- get
       put $ addReproduction $ addNoneMovement stats
-      reproduce gen env runnables mutationRate nrParam
+      reproduce gen env runnables mutationRate nrParam ratio
     Up -> do
       print' "moving up"
       stats <- get
@@ -425,11 +427,11 @@ print' = liftIO . print
 putStr' :: String -> StateT TrackingStats IO ()
 putStr' = liftIO . putStr
 
-run :: Environment Creature -> RunState Creature -> StateT TrackingStats IO [Environment Creature]
-run env (RunState _ [] _ _ _) = do
+run :: Environment Creature -> RunState Creature -> Int -> StateT TrackingStats IO [Environment Creature]
+run env (RunState _ [] _ _ _) _ = do
   liftIO $ print "no organisms found"
   return [env]
-run env (RunState iteration runningQueue gen mutationRate nrParam) = do
+run env (RunState iteration runningQueue gen mutationRate nrParam) ratio = do
   print' ""
   print' iteration
   print' runningQueue
@@ -441,7 +443,7 @@ run env (RunState iteration runningQueue gen mutationRate nrParam) = do
       print' "organism:"
       print' $ organism currentRunnable
       putStr' $ show (expression $ organism currentRunnable)
-      (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate nrParam
+      (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate nrParam ratio
       let total = Environment.getSize newEnv
           current = length newRunnables
           newIteration = iteration - 1
@@ -457,13 +459,13 @@ run env (RunState iteration runningQueue gen mutationRate nrParam) = do
               newState = RunState newIteration runnablesAfterKilled g'' mutationRate nrParam
               envAfterKilled = nillify newEnv kills
           print' envAfterKilled
-          restRun <- run envAfterKilled newState
+          restRun <- run envAfterKilled newState ratio
           return $ env : restRun
         else do
           print' "not killing things"
           let newState = RunState newIteration newRunnables rightGen mutationRate nrParam
           print' newEnv
-          restRun <- run newEnv newState
+          restRun <- run newEnv newState ratio
           return $ env : restRun
 
 performAction ::
@@ -472,9 +474,10 @@ performAction ::
   [Runnable Creature] ->
   Int ->
   Int ->
+  Int ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-performAction _ env [] _ _ = return ([], env)
-performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
+performAction _ env [] _ _ _ = return ([], env)
+performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ _ = do
   print' "trying to aquire resources"
   print' $ unsafeGetResources env pos
   if hasResources env pos
@@ -495,7 +498,7 @@ performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
     else do
       print' "no resource found"
       return (rest ++ [Runnable org pos ResourceAquirement res], env)
-performAction gen env (Runnable org pos Execution res : rest) _ _ = do
+performAction gen env (Runnable org pos Execution res : rest) _ _ _ = do
   print' "execution"
   print' $ expression org
   executedCreature <- liftIO $ executeCreature org res
@@ -510,9 +513,9 @@ performAction gen env (Runnable org pos Execution res : rest) _ _ = do
       addedEnv <- liftIO $ addResourceToNeighbours gen env pos out
       let addedEnv' = insertOrganismAt addedEnv newCreature pos
       return (rest ++ [Runnable newCreature pos SystemCall []], addedEnv')
-performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate nrParam = do
+performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate nrParam ratio = do
   print' "doing a system call"
-  executeAction gen env runnables (register org) mutationRate nrParam
+  executeAction gen env runnables (register org) mutationRate nrParam ratio
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -539,7 +542,7 @@ matchPercentages :: [(InstructionSequence, Int)] -> [Double]
 matchPercentages [] = []
 matchPercentages [_] = []
 matchPercentages ((x, lx) : l) =
-  [1 - (fromIntegral (editDist x y) / fromIntegral (lx + ly)) | (y, ly) <- l]
+  [(fromIntegral (editDist x y) / fromIntegral (lx + ly)) | (y, ly) <- l]
     ++ matchPercentages l
 
 creatureToStack :: Creature -> (InstructionSequence, Int)
@@ -551,8 +554,7 @@ creatureToStack org =
 calculateAncestorDiversity :: [Environment Creature] -> InstructionSequence -> Int -> [[Double]]
 calculateAncestorDiversity envs anc len =
   ( ( \(sq, l) ->
-        1
-          - (fromIntegral (editDist sq anc) / fromIntegral (l + len))
+        (fromIntegral (editDist sq anc) / fromIntegral (l + len))
     )
       <$>
   )
@@ -562,22 +564,19 @@ calculateAncestorDiversity envs anc len =
     stacks = (creatureToStack <$>) <$> creatures
 
 -- | The main function.
-mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> IO ()
-mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam = do
+mainCreature :: Seed -> ASTExpression -> Double -> Int -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor1 start1 iterations l mutationRate nrParam ratio = do
   let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
   ser1 <- serializeExpression ancestor1 nrParam
-  ser2 <- serializeExpression ancestor2 nrParam
   let anc1 = Creature ancestor1 0 ser1 0 start1 start1
       ancStack1 = toStack ancestor1
-      anc2 = Creature ancestor2 0 ser2 0 start2 start2
-      ancStack2 = toStack ancestor2
-  env <- initializeEnvironment Moore g1 [anc1, anc2] lim
+  env <- initializeEnvironment Moore g1 [anc1] lim
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
-  (envList, trackingStats) <- runStateT (run env firstState) emptyTracking
+  (envList, trackingStats) <- runStateT (run env firstState ratio) emptyTracking
   let postStats =
         postCalculation
           envList
@@ -587,27 +586,13 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
           (calculateDiversity envList)
           age
           (calculateAncestorDiversity envList ancStack1 (size ancestor1))
-          (calculateAncestorDiversity envList ancStack2 (size ancestor2))
   -- serialize these stats
-  let trackingDirectory = "./trackingStats/"
-  let postDirectory = "./postStats/"
+  let trackingDirectory = "./trackingMutationComparison/"
+  let postDirectory = "./postMutationComparison/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "ancestor1= "
-          ++ genotype anc1
-          ++ "_ancestor2= "
-          ++ genotype anc2
-          ++ "_seed= "
-          ++ show seed
-          ++ "_halfMixedMutationRate= "
-          ++ show mutationRate
-          ++ "_iterations= "
-          ++ show iterations
-          ++ "_limit= "
-          ++ show l
-          ++ "_nrParam= "
-          ++ show nrParam
+        "mixed" ++ show ratio ++ "_4 " ++ show mutationRate ++ " seed= " ++ show seed
   print name
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
