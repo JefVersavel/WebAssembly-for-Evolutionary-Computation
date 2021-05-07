@@ -42,14 +42,32 @@ checkForReproduction seeds = do
       ]
   return $ map snd $ filter (isReproduction . fst) syscallsSeedings
 
+checkForDoingNothing :: [Int] -> IO [Seeding]
+checkForDoingNothing seeds = do
+  let sizes = [1 .. 10]
+  let depths = [1 .. 20]
+  syscallsSeedings <-
+    sequence
+      [ redirectIO (seeder seed sze dpth, (seed, sze, dpth))
+        | sze <- sizes,
+          dpth <- depths,
+          sze > 2 * dpth,
+          seed <- seeds
+      ]
+  return $ map snd $ filter (isDoingNothing . fst) syscallsSeedings
+
 isReproduction :: SysCall -> Bool
 isReproduction Reproduction = True
 isReproduction _ = False
 
+isDoingNothing :: SysCall -> Bool
+isDoingNothing None = True
+isDoingNothing _ = False
+
 lookForSeeds :: IO ()
 lookForSeeds = do
   let seeds = [0 .. 10]
-  reproductions <- checkForReproduction seeds
+  reproductions <- checkForDoingNothing seeds
   showVerticalList reproductions
 
 getSizesDepths :: IO ()
