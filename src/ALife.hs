@@ -20,6 +20,7 @@ import ExecuteWasm
 import GHC.Generics
 import Generators
 import GeneticOperations
+import ImportedFunction
 import Interaction
 import Movement
 import Organism
@@ -121,18 +122,18 @@ changeState (Creature e r b a _ start) s = Creature e r b a s start
 -- value of the registers of the creatures and the limits of the environment.
 -- The amount of creatures that need to be generated is equal to at least a
 -- tenth of the total cells in the environment.
-generateInitPop :: QCGen -> Double -> Depth -> Lim -> Int -> Int -> IO [Creature]
-generateInitPop gen start depth lim divider nrParam = do
+generateInitPop :: QCGen -> Double -> Depth -> Lim -> Int -> Int -> ImportedFunctions -> IO [Creature]
+generateInitPop gen start depth lim divider nrParam functions = do
   if nrParam > 5
     then error "the number of parameters cannot be bigger than 5"
     else do
       let s = uncurry (*) lim `div` divider + 1
       let (g1, g2) = split gen
-      ex <- sequence [generate g | g <- rampedHalfNHalf g1 depth nrParam 0.5 s]
+      ex <- sequence [generate g | g <- rampedHalfNHalf g1 depth nrParam 0.5 s functions]
       let (gg, ggg) = split g2
       let starts = generateStart gg s start
       let states = generateStart ggg s start
-      serializeds <- serializeExpressions ex nrParam
+      serializeds <- serializeExpressions ex nrParam functions
       return [Creature e st b 0 sta sta | (e, st, b, sta) <- List.zip4 ex starts (map snd serializeds) states]
 
 -- | Generates a list of random values for the registers of the creatures
@@ -142,18 +143,27 @@ generateStart gen s start = take s $ randomRs (0, start) gen
 
 -- | Initializes a new environment with a given neighbourhood and limits.
 -- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> IO (Environment Creature)
-initEnvironment gen n l s depth divider nrParam = do
+initEnvironment ::
+  QCGen ->
+  Neighbourhood ->
+  Lim ->
+  Double ->
+  Depth ->
+  Int ->
+  Int ->
+  ImportedFunctions ->
+  IO (Environment Creature)
+initEnvironment gen n l s depth divider nrParam functions = do
   let (g1, g2) = split gen
-  pop <- generateInitPop g1 s depth l divider nrParam
+  pop <- generateInitPop g1 s depth l divider nrParam functions
   initializeEnvironment n g2 pop l
 
 -- | Performs sun-tree mutation of the given list of creatures.
-mutateCreature :: QCGen -> Creature -> Int -> IO Creature
-mutateCreature gen creature nrParam = do
+mutateCreature :: QCGen -> Creature -> Int -> ImportedFunctions -> IO Creature
+mutateCreature gen creature nrParam functions = do
   let r = register creature
-  e <- subTreeMutation gen (expression creature) nrParam
-  serialized <- serializeExpression e nrParam
+  e <- subTreeMutation gen (expression creature) nrParam functions
+  serialized <- serializeExpression e nrParam functions
   return $ Creature e r serialized (age creature) (internalState creature) (startState creature)
 
 -- | Executes the given list of creatures by updating its register with the outcome of the execution.
@@ -190,9 +200,10 @@ reproduce ::
   [Runnable Creature] ->
   Int ->
   Int ->
+  ImportedFunctions ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-reproduce _ env [] _ _ = return ([], env)
-reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
+reproduce _ env [] _ _ _ = return ([], env)
+reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam functions = do
   let nils = getNilNeighbours env pos
       newCreature = reborn creature
       (g1, g2) = split gen
@@ -208,7 +219,7 @@ reproduce gen env ((Runnable creature pos _ _) : rest) mutationRate nrParam = do
       print' "mutate"
       stats <- get
       put $ addMutation stats
-      mutated <- liftIO $ mutateCreature g3 newCreature nrParam
+      mutated <- liftIO $ mutateCreature g3 newCreature nrParam functions
       print' "this is the child"
       putStr' $ show mutated
       return
@@ -240,9 +251,10 @@ executeAction ::
   Double ->
   Int ->
   Int ->
+  ImportedFunctions ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-executeAction _ env [] _ _ _ = return ([], env)
-executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutationRate nrParam = do
+executeAction _ env [] _ _ _ _ = return ([], env)
+executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutationRate nrParam functions = do
   print' out
   syscall <- liftIO $ decideSysCall out (expression $ organism x)
   case syscall of
@@ -250,27 +262,27 @@ executeAction gen env runnables@(x@(Runnable creature pos _ _) : xs) out mutatio
       print' "reproducing"
       stats <- get
       put $ addReproduction $ addNoneMovement stats
-      reproduce gen env runnables mutationRate nrParam
+      reproduce gen env runnables mutationRate nrParam functions
     Up -> do
       print' "moving up"
       stats <- get
       put $ addMovement $ addNoneReproduction stats
-      tryMovement gen runnables U env nrParam
+      tryMovement gen runnables U env nrParam functions
     Down -> do
       print' "moving down"
       stats <- get
       put $ addMovement $ addNoneReproduction stats
-      tryMovement gen runnables D env nrParam
+      tryMovement gen runnables D env nrParam functions
     Rght -> do
       print' "moving right"
       stats <- get
       put $ addMovement $ addNoneReproduction stats
-      tryMovement gen runnables R env nrParam
+      tryMovement gen runnables R env nrParam functions
     Lft -> do
       print' "moving left"
       stats <- get
       put $ addMovement $ addNoneReproduction stats
-      tryMovement gen runnables L env nrParam
+      tryMovement gen runnables L env nrParam functions
     None -> do
       print' "do nothing"
       stats <- get
@@ -283,9 +295,10 @@ tryMovement ::
   Move ->
   Environment Creature ->
   Int ->
+  ImportedFunctions ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-tryMovement _ [] _ env _ = return ([], env)
-tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam =
+tryMovement _ [] _ env _ _ = return ([], env)
+tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam functions =
   case moveOrg env pos mov of
     Left (newPos, newEnv) -> do
       print' newPos
@@ -312,8 +325,8 @@ tryMovement gen (Runnable creature pos _ _ : rest) mov env nrParam =
           putStr' $ show leftChild
           putStr' "rightchild:"
           putStr' $ show rightChild
-          leftSer <- liftIO $ serializeExpression leftChild nrParam
-          rightSer <- liftIO $ serializeExpression rightChild nrParam
+          leftSer <- liftIO $ serializeExpression leftChild nrParam functions
+          rightSer <- liftIO $ serializeExpression rightChild nrParam functions
           print' "serialization has happened"
           (lPos, rPos) <- liftIO $ getChildPositions crossgen env pos newPos
           let lft =
@@ -409,11 +422,11 @@ print' = liftIO . print
 putStr' :: String -> StateT TrackingStats IO ()
 putStr' = liftIO . putStr
 
-run :: Environment Creature -> RunState Creature -> StateT TrackingStats IO [Environment Creature]
-run env (RunState _ [] _ _ _) = do
+run :: Environment Creature -> RunState Creature -> ImportedFunctions -> StateT TrackingStats IO [Environment Creature]
+run env (RunState _ [] _ _ _) _ = do
   liftIO $ print "no organisms found"
   return [env]
-run env (RunState iteration runningQueue gen mutationRate nrParam) = do
+run env (RunState iteration runningQueue gen mutationRate nrParam) functions = do
   print' ""
   print' iteration
   print' runningQueue
@@ -425,7 +438,7 @@ run env (RunState iteration runningQueue gen mutationRate nrParam) = do
       print' "organism:"
       print' $ organism currentRunnable
       putStr' $ show (expression $ organism currentRunnable)
-      (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate nrParam
+      (newRunnables, newEnv) <- performAction leftGen env runningQueue mutationRate nrParam functions
       let total = Environment.getSize newEnv
           current = length newRunnables
           newIteration = iteration - 1
@@ -441,13 +454,13 @@ run env (RunState iteration runningQueue gen mutationRate nrParam) = do
               newState = RunState newIteration runnablesAfterKilled g'' mutationRate nrParam
               envAfterKilled = nillify newEnv kills
           print' envAfterKilled
-          restRun <- run envAfterKilled newState
+          restRun <- run envAfterKilled newState functions
           return $ env : restRun
         else do
           print' "not killing things"
           let newState = RunState newIteration newRunnables rightGen mutationRate nrParam
           print' newEnv
-          restRun <- run newEnv newState
+          restRun <- run newEnv newState functions
           return $ env : restRun
 
 performAction ::
@@ -456,9 +469,10 @@ performAction ::
   [Runnable Creature] ->
   Int ->
   Int ->
+  ImportedFunctions ->
   StateT TrackingStats IO ([Runnable Creature], Environment Creature)
-performAction _ env [] _ _ = return ([], env)
-performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
+performAction _ env [] _ _ _ = return ([], env)
+performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ _ = do
   print' "trying to aquire resources"
   print' $ unsafeGetResources env pos
   if hasResources env pos
@@ -479,7 +493,7 @@ performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
     else do
       print' "no resource found"
       return (rest ++ [Runnable org pos ResourceAquirement res], env)
-performAction gen env (Runnable org pos Execution res : rest) _ _ = do
+performAction gen env (Runnable org pos Execution res : rest) _ _ _ = do
   print' "execution"
   print' $ expression org
   executedCreature <- liftIO $ executeCreature org res
@@ -494,9 +508,9 @@ performAction gen env (Runnable org pos Execution res : rest) _ _ = do
       addedEnv <- liftIO $ addResourceToNeighbours gen env pos out
       let addedEnv' = insertOrganismAt addedEnv newCreature pos
       return (rest ++ [Runnable newCreature pos SystemCall []], addedEnv')
-performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate nrParam = do
+performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate nrParam functions = do
   print' "doing a system call"
-  executeAction gen env runnables (register org) mutationRate nrParam
+  executeAction gen env runnables (register org) mutationRate nrParam functions
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -533,11 +547,12 @@ mainCreature seed start iterations l depth mutationRate divider nrParam = do
       lim = (l, l)
   putStr "\n\n"
   print name
-  env <- initEnvironment g1 Moore lim start depth divider nrParam
+  let importedFunctions = [ImportedFunction "a" 1, ImportedFunction "b" 2]
+  env <- initEnvironment g1 Moore lim start depth divider nrParam importedFunctions
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
-  (envList, trackingStats) <- runStateT (run env firstState) emptyTracking
+  (envList, trackingStats) <- runStateT (run env firstState importedFunctions) emptyTracking
   let postStats =
         postCalculation
           envList

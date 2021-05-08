@@ -56,10 +56,15 @@ executeModule bytes params int =
 
   mod = x => Math.round(x) % 2
 
+  a = x => x * x
+
+  b = (x, y) => Math.pow(x, y)
+
   let importObject = {
       external: { param0, param1, param2, param3, param4 },
       internal: { state },
-      importFunctions: { mod }
+      specialImports: { mod },
+      importedFunctions: {a, b}
   };
   return WebAssembly.instantiate(typedArray,importObject).then(result => {
     let json = {}
