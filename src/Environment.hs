@@ -446,20 +446,23 @@ initializeEnvironment ::
   QCGen ->
   [a] ->
   Lim ->
+  Int ->
   IO (Environment a)
-initializeEnvironment n gen orgList lim = do
+initializeEnvironment n gen orgList lim am = do
   let (g1, g2) = R.split gen
   posOrgs <- distribute gen orgList lim
   let posList = map fst posOrgs
   let env = fillInOrgs (empty lim n) posOrgs
   let amount = floor (fromIntegral (getSize env) :: Double)
-  let resources = generateResources g1 amount 5
+  -- let resources = generateResources g1 amount 0
   let (g21, g22) = R.split g2
   print "ok we got here"
-  let extraRes = generateResourcesFixed g21 (length posList) 10
-  posRes <- distribute g22 resources lim
-  let newEnv = fillInResources env posRes
-  let extraResEnv = fillInResources newEnv $ zip posList extraRes
+  let extraRes
+        | am == 0 = []
+        | otherwise = generateResourcesFixed g2 (length posList) am
+  -- posRes <- distribute g22 resources lim
+  -- let newEnv = fillInResources env posRes
+  let extraResEnv = fillInResources env $ zip posList extraRes
   return extraResEnv
 
 -- generateResourcesPos :: QCGen -> [Pos] -> Int -> [(Pos, [Resource])]
@@ -509,7 +512,11 @@ generateResources gen amount m = take randomSize infinteList : generateResources
 -- with a fixed length.
 generateResourcesFixed :: QCGen -> Int -> Int -> [[Resource]]
 generateResourcesFixed _ 0 _ = []
-generateResourcesFixed gen amount m = take m infinteList : generateResources g1 (amount - 1) m
+generateResourcesFixed gen amount m = take m infinteList : generateResourcesFixed g1 (amount - 1) m
   where
     (g1, g2) = R.split gen
     infinteList = R.randomRs (bottom, top) g2
+
+generationTest = do
+  seed <- newSeed
+  return $ generateResourcesFixed seed 5 2

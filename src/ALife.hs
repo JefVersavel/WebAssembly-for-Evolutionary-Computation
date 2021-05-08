@@ -146,19 +146,19 @@ generateInitPop gen start depth lim divider nrParam = do
 generateStart :: QCGen -> Size -> Double -> [Double]
 generateStart gen s start = take s $ randomRs (0, start) gen
 
--- | Initializes a new environment with a given neighbourhood and limits.
--- It also generates a population of creatures and distributes them in the environment.
-initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> IO (Environment Creature)
-initEnvironment gen n l s depth divider nrParam = do
-  let (g1, g2) = split gen
-  pop <- generateInitPop g1 s depth l divider nrParam
-  initializeEnvironment n g2 pop l
-
-initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
-initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
-
-initEnvironmentEmpty :: QCGen -> Neighbourhood -> Lim -> IO (Environment Creature)
-initEnvironmentEmpty gen n l = initializeEnvironment n gen [] l
+-- -- | Initializes a new environment with a given neighbourhood and limits.
+-- -- It also generates a population of creatures and distributes them in the environment.
+-- initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> Int -> IO (Environment Creature)
+-- initEnvironment gen n l s depth divider nrParam = do
+--   let (g1, g2) = split gen
+--   pop <- generateInitPop g1 s depth l divider nrParam
+--   initializeEnvironment n g2 pop l
+--
+-- initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
+-- initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
+--
+-- initEnvironmentEmpty :: QCGen -> Neighbourhood -> Lim -> IO (Environment Creature)
+-- initEnvironmentEmpty gen n l = initializeEnvironment n gen [] l
 
 -- | Performs sun-tree mutation of the given list of creatures.
 mutateCreature :: QCGen -> Creature -> Int -> IO Creature
@@ -477,24 +477,19 @@ performAction _ env [] _ _ = return ([], env)
 performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
   print' "trying to aquire resources"
   print' $ unsafeGetResources env pos
-  if hasResources env pos
+  let nrParamsNeeded = length (getParameters $ expression org) - length res
+      newRes
+        | nrParamsNeeded > 0 = unsafeGetRandomResource env gen pos nrParamsNeeded
+        | otherwise = []
+  print' "resource:"
+  print' newRes
+  let deletedEnv = deleteSubResources env pos newRes
+  if length newRes == nrParamsNeeded
     then do
-      let nrParamsNeeded = length (getParameters $ expression org) - length res
-          newRes
-            | nrParamsNeeded > 0 = unsafeGetRandomResource env gen pos nrParamsNeeded
-            | otherwise = []
-      print' "resource:"
-      print' newRes
-      let deletedEnv = deleteSubResources env pos newRes
-      if length newRes == nrParamsNeeded
-        then do
-          return
-            (rest ++ [Runnable org pos (nextAction ResourceAquirement) newRes], deletedEnv)
-        else do
-          return (rest ++ [Runnable org pos ResourceAquirement newRes], deletedEnv)
+      return
+        (rest ++ [Runnable org pos Execution newRes], deletedEnv)
     else do
-      print' "no resource found"
-      return (rest ++ [Runnable org pos ResourceAquirement res], env)
+      return (rest ++ [Runnable org pos ResourceAquirement newRes], deletedEnv)
 performAction gen env (Runnable org pos Execution res : rest) _ _ = do
   print' "execution"
   print' $ expression org
@@ -562,8 +557,8 @@ calculateAncestorDiversity envs anc len =
     stacks = (creatureToStack <$>) <$> creatures
 
 -- | The main function.
-mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> IO ()
-mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam = do
+mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam multi amount = do
   let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
@@ -573,7 +568,8 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
       ancStack1 = toStack ancestor1
       anc2 = Creature ancestor2 0 ser2 0 start2 start2
       ancStack2 = toStack ancestor2
-  env <- initializeEnvironment Moore g1 [anc1, anc2] lim
+      generators = [anc2 | _ <- [1 .. multi]]
+  env <- initializeEnvironment Moore g1 (anc1 : generators) lim amount
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -589,25 +585,17 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
           (calculateAncestorDiversity envList ancStack1 (size ancestor1))
           (calculateAncestorDiversity envList ancStack2 (size ancestor2))
   -- serialize these stats
-  let trackingDirectory = "./trackingStats/"
-  let postDirectory = "./postStats/"
+  let trackingDirectory = "./trackingGeneral/"
+  let postDirectory = "./postGeneral/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "ancestor1= "
-          ++ genotype anc1
-          ++ "_ancestor2= "
-          ++ genotype anc2
-          ++ "_seed= "
+        "generator= " ++ show (genotype anc2) ++ " m= "
+          ++ show multi
+          ++ " a= "
+          ++ show amount
+          ++ " seed= "
           ++ show seed
-          ++ "_halfMixedMutationRate= "
-          ++ show mutationRate
-          ++ "_iterations= "
-          ++ show iterations
-          ++ "_limit= "
-          ++ show l
-          ++ "_nrParam= "
-          ++ show nrParam
   print name
   encodeFile (trackingDirectory ++ name) $ toJSON trackingStats
   encodeFile (postDirectory ++ name) $ toJSON postStats
