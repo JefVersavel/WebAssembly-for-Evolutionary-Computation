@@ -67,7 +67,7 @@ executeModule bytes params int =
     json.internal = result.instance.exports.state.value
     return json
   }).catch(e => {
-    return 65468151541;
+    return Infinity;
   });
   |]
     return (A.decode $ unEncodedJSON jsn :: Maybe Output)
