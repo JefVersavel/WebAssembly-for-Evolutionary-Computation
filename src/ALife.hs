@@ -501,7 +501,7 @@ performAction gen env (Runnable org pos Execution res : rest) _ _ = do
   executedCreature <- liftIO $ executeCreature org res
   let out = register executedCreature
       newCreature = grow executedCreature
-  if isNaN out
+  if isNaN out || isNaN (internalState executedCreature)
     then do
       -- remove creature if outcome is NaN
       let removedEnv = nillify env [pos]
