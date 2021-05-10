@@ -26,11 +26,14 @@ def makeIncrementList(list, inc=True):
     return newList
 
 
-def saveImages(data, names):
+def saveImages(data, names, entries):
     if len(data) != len(names):
         return
 
     for i in range(len(data)):
+        fig, ax = plt.subplots()
+        ax.set_xlabel("iterations")
+        ax.set_ylabel(entries[i])
         plt.plot(data[i])
         plt.savefig(names[i])
         plt.close("all")
@@ -59,19 +62,33 @@ def makeCharts(dir, inc=True):
         names = []
         newDir = dir + "/dir_" + name
         os.makedirs(newDir, exist_ok=True)
+        entries = []
         for entry in file.keys():
             normalData = file.get(entry)
             incData = makeIncrementList(normalData, inc)
             data.append(incData)
             newName = newDir + "/" + entry
+            if entry == "ancestor1Diff":
+                entry = "matching % to ancestor"
+            if entry == "ancestor2Divv":
+                entry = "matching % to generator"
+            if entry == "nrParams":
+                entry = "#parameters"
+            if entry == "popGrowth":
+                entry = "population total"
+            if entry == "diversity":
+                entry = "matching %"
+            if entry == "resourceGrowth":
+                entry = "resource total"
+            entries.append(entry)
             names.append(newName)
 
-        saveImages(data, names)
+        saveImages(data, names, entries)
 
 
 def main():
-    makeCharts("./trackingStats")
-    makeCharts("./postStats", False)
+    makeCharts("../trackingGeneral")
+    makeCharts("../postGeneral", False)
 
 if __name__ == "__main__":
     main()

@@ -477,7 +477,8 @@ performAction _ env [] _ _ = return ([], env)
 performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
   print' "trying to aquire resources"
   print' $ unsafeGetResources env pos
-  let nrParamsNeeded = length (getParameters $ expression org) - length res
+  let newCreature = grow org
+  let nrParamsNeeded = length (getParameters $ expression newCreature) - length res
       newRes
         | nrParamsNeeded > 0 = unsafeGetRandomResource env gen pos nrParamsNeeded
         | otherwise = []
@@ -487,9 +488,9 @@ performAction gen env (Runnable org pos ResourceAquirement res : rest) _ _ = do
   if length newRes == nrParamsNeeded
     then do
       return
-        (rest ++ [Runnable org pos Execution newRes], deletedEnv)
+        (rest ++ [Runnable newCreature pos Execution newRes], deletedEnv)
     else do
-      return (rest ++ [Runnable org pos ResourceAquirement newRes], deletedEnv)
+      return (rest ++ [Runnable newCreature pos ResourceAquirement newRes], deletedEnv)
 performAction gen env (Runnable org pos Execution res : rest) _ _ = do
   print' "execution"
   print' $ expression org
@@ -505,9 +506,11 @@ performAction gen env (Runnable org pos Execution res : rest) _ _ = do
       addedEnv <- liftIO $ addResourceToNeighbours gen env pos out
       let addedEnv' = insertOrganismAt addedEnv newCreature pos
       return (rest ++ [Runnable newCreature pos SystemCall []], addedEnv')
-performAction gen env runnables@(Runnable org _ SystemCall _ : _) mutationRate nrParam = do
+performAction gen env (Runnable org a SystemCall b : rest) mutationRate nrParam = do
+  let newCreature = grow org
   print' "doing a system call"
-  executeAction gen env runnables (register org) mutationRate nrParam
+  let runnables = Runnable newCreature a SystemCall b : rest
+  executeAction gen env runnables (register newCreature) mutationRate nrParam
 
 -- | Inserts a new organism in the running queue
 insertNewOrg :: [Runnable Creature] -> Creature -> Pos -> [Runnable Creature]
@@ -590,7 +593,11 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "generator= " ++ show (genotype anc2) ++ " m= "
+        "generator= "
+          ++ show (genotype anc2)
+          ++ " ancestor= "
+          ++ show (genotype anc1)
+          ++ " m= "
           ++ show multi
           ++ " a= "
           ++ show amount

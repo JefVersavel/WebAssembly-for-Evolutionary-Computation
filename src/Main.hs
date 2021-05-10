@@ -5,7 +5,7 @@ import AST
 import Ancestor
 
 seeds :: [Int]
-seeds = [1 .. 10]
+seeds = [1 .. 5]
 
 ancestorCombos :: [(ASTExpression, Double)]
 ancestorCombos = [(ancestor1, start1)]
@@ -21,9 +21,20 @@ mutationRates = [2 .. 10]
 main :: IO [()]
 main = do
   sequence
-    [ mainCreature seed ancestor1 gen start1 st 10000 5 10 5 m a
+    [ mainCreature seed ancestor2 generator1 start2 generatorStart1 10000 5 10 5 m a
       | seed <- seeds,
-        (gen, st) <- generators,
-        m <- [1 .. 3],
-        a <- [0 .. 2]
+        m <- [2 .. 3],
+        a <- [1 .. 2]
+    ]
+  sequence
+    [ mainCreature seed ancestor1 generator2 start1 generatorStart2 10000 5 10 5 m a
+      | seed <- seeds,
+        m <- [2 .. 3],
+        a <- [1 .. 2]
+    ]
+  sequence
+    [ mainCreature seed ancestor2 generator2 start2 generatorStart2 10000 5 10 5 m a
+      | seed <- seeds,
+        m <- [2 .. 3],
+        a <- [1 .. 2]
     ]
