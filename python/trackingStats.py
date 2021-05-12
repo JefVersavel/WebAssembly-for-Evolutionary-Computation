@@ -87,8 +87,8 @@ def makeCharts(dir, inc=True):
 
 
 def main():
-    makeCharts("../trackingGeneral")
-    makeCharts("../postGeneral", False)
+    makeCharts("../trackingGeneralBig")
+    makeCharts("../postGeneralBig", False)
 
 if __name__ == "__main__":
     main()
