@@ -588,8 +588,8 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
           (calculateAncestorDiversity envList ancStack1 (size ancestor1))
           (calculateAncestorDiversity envList ancStack2 (size ancestor2))
   -- serialize these stats
-  let trackingDirectory = "./trackingGeneralBig/"
-  let postDirectory = "./postGeneralBig/"
+  let trackingDirectory = "./trackingGeneralAncestor5/"
+  let postDirectory = "./postGeneralAncestor5/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
