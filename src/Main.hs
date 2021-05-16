@@ -25,9 +25,7 @@ goodCombos =
 main :: IO [()]
 main = do
   sequence
-    [ mainCreature seed ancestor6 gen start6 st 10000 5 10 5 m a
+    [ mainCreature seed ancestor1 ancestor6 start1 start6 10000 5 10 5 a
       | seed <- seeds,
-        (gen, st) <- generators,
-        m <- [1 .. 3],
-        a <- [3 .. 6]
+        a <- [1 .. 10]
     ]

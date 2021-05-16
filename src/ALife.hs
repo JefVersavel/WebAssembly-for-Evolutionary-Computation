@@ -560,8 +560,8 @@ calculateAncestorDiversity envs anc len =
     stacks = (creatureToStack <$>) <$> creatures
 
 -- | The main function.
-mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam multi amount = do
+mainCreature :: Seed -> ASTExpression -> ASTExpression -> Double -> Double -> Int -> Int -> Int -> Int -> Int -> IO ()
+mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nrParam amount = do
   let (g1, g2) = split $ mkQCGen seed
       lim = (l, l)
   putStr "\n\n"
@@ -571,8 +571,7 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
       ancStack1 = toStack ancestor1
       anc2 = Creature ancestor2 0 ser2 0 start2 start2
       ancStack2 = toStack ancestor2
-      generators = [anc2 | _ <- [1 .. multi]]
-  env <- initializeEnvironment Moore g1 (anc1 : generators) lim amount
+  env <- initializeEnvironment Moore g1 [anc1, anc2] lim amount
   print "Init"
   print env
   let firstState = makeState env iterations g2 mutationRate nrParam
@@ -588,17 +587,15 @@ mainCreature seed ancestor1 ancestor2 start1 start2 iterations l mutationRate nr
           (calculateAncestorDiversity envList ancStack1 (size ancestor1))
           (calculateAncestorDiversity envList ancStack2 (size ancestor2))
   -- serialize these stats
-  let trackingDirectory = "./trackingGeneralAncestor5/"
-  let postDirectory = "./postGeneralAncestor5/"
+  let trackingDirectory = "./trackingtwo/"
+  let postDirectory = "./posttwo/"
   createDirectoryIfMissing True trackingDirectory
   createDirectoryIfMissing True postDirectory
   let name =
-        "generator= "
+        "ancestor1= "
           ++ show (genotype anc2)
-          ++ " ancestor= "
+          ++ " ancestor2= "
           ++ show (genotype anc1)
-          ++ " m= "
-          ++ show multi
           ++ " a= "
           ++ show amount
           ++ " seed= "

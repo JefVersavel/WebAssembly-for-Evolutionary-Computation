@@ -450,20 +450,13 @@ initializeEnvironment ::
   IO (Environment a)
 initializeEnvironment n gen orgList lim am = do
   let (g1, g2) = R.split gen
-  posOrgs <- distribute gen orgList lim
-  let posList = map fst posOrgs
+  let posOrgs = [((2, 2), head orgList), ((4, 4), head $ tail orgList)]
   let env = fillInOrgs (empty lim n) posOrgs
   let amount = floor (fromIntegral (getSize env) :: Double)
-  -- let resources = generateResources g1 amount 0
-  let (g21, g22) = R.split g2
-  print "ok we got here"
-  let extraRes
-        | am == 0 = []
-        | otherwise = generateResourcesFixed g2 (length posList) am
-  -- posRes <- distribute g22 resources lim
-  -- let newEnv = fillInResources env posRes
-  let extraResEnv = fillInResources env $ zip posList extraRes
-  return extraResEnv
+  let resources = generateResources g1 amount am
+  posRes <- distribute g2 resources lim
+  let newEnv = fillInResources env posRes
+  return newEnv
 
 -- generateResourcesPos :: QCGen -> [Pos] -> Int -> [(Pos, [Resource])]
 -- generateResourcesPos gen [] _ []
@@ -502,11 +495,10 @@ top = 999
 -- with a random length no greater than a given maximum size.
 generateResources :: QCGen -> Int -> Int -> [[Resource]]
 generateResources _ 0 _ = []
-generateResources gen amount m = take randomSize infinteList : generateResources g3 (amount - 1) m
+generateResources gen amount m = take m infinteList : generateResources g2 (amount - 1) m
   where
     (g1, g2) = R.split gen
-    (randomSize, g3) = R.randomR (1, m) g1
-    infinteList = R.randomRs (bottom, top) g2
+    infinteList = R.randomRs (bottom, top) g1
 
 -- | Generates a list of a given length of lists of randomly generated resources
 -- with a fixed length.

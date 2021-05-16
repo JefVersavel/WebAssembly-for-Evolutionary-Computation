@@ -69,9 +69,9 @@ def makeCharts(dir, inc=True):
             data.append(incData)
             newName = newDir + "/" + entry
             if entry == "ancestor1Diff":
-                entry = "matching % to ancestor"
+                entry = "matching % to 1st ancestor"
             if entry == "ancestor2Divv":
-                entry = "matching % to generator"
+                entry = "matching % to 2nd ancestor"
             if entry == "nrParams":
                 entry = "#parameters"
             if entry == "popGrowth":
@@ -87,8 +87,8 @@ def makeCharts(dir, inc=True):
 
 
 def main():
-    makeCharts("../trackingGeneralAncestor5")
-    makeCharts("../postGeneralAncestor5", False)
+    makeCharts("../trackingtwo")
+    makeCharts("../posttwo", False)
 
 if __name__ == "__main__":
     main()
