@@ -152,7 +152,7 @@ initEnvironment :: QCGen -> Neighbourhood -> Lim -> Double -> Depth -> Int -> In
 initEnvironment gen n l s depth divider nrParam start = do
   let (g1, g2) = split gen
   pop <- generateInitPop g1 s depth l divider nrParam
-  initializeEnvironment n g2 (take 1 pop) l start
+  initializeEnvironment n g2 pop l start
 
 -- initEnvironmentAncestor :: QCGen -> Neighbourhood -> Lim -> Creature -> IO (Environment Creature)
 -- initEnvironmentAncestor gen n l creature = initializeEnvironment n gen [creature] l
@@ -545,8 +545,7 @@ creatureToStack org =
 mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> Int -> IO ()
 mainCreature seed start iterations l depth mutationRate divider nrParam startRes = do
   let name =
-        "quadruple "
-          ++ show startRes
+        show startRes
           ++ " seed= "
           ++ show seed
           ++ "_iterations= "
