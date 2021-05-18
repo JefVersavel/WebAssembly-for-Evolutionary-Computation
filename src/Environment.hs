@@ -456,7 +456,7 @@ initializeEnvironment n gen orgList lim start = do
   let amount = floor (fromIntegral (getSize env) :: Double)
   let resources = generateResources g1 amount 0
   let (g21, g22) = R.split g2
-  let extraRes = generateResourcesFixed g21 (length posList) start
+  let extraRes = generateResourcesFixed g21 (length posList) $ start * 2
   posRes <- distribute g22 resources lim
   let newEnv = fillInResources env posRes
   let extraResEnv = fillInResources newEnv $ zip posList extraRes
