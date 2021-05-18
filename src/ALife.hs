@@ -545,7 +545,7 @@ creatureToStack org =
 mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> Int -> IO ()
 mainCreature seed start iterations l depth mutationRate divider nrParam startRes = do
   let name =
-        "double "
+        "triple "
           ++ show startRes
           ++ " seed= "
           ++ show seed
