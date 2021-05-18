@@ -545,7 +545,8 @@ creatureToStack org =
 mainCreature :: Seed -> Double -> Int -> Int -> Depth -> Int -> Int -> Int -> Int -> IO ()
 mainCreature seed start iterations l depth mutationRate divider nrParam startRes = do
   let name =
-        show startRes
+        "only on orgs "
+          ++ show startRes
           ++ " seed= "
           ++ show seed
           ++ "_iterations= "
